@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {{name}}</title>
+    <link rel="stylesheet" href="../styles/base.css">
+    <style>
+        /* Banner Layout */
+        .resume-header {
+            background-color: var(--primary-color, #1f2937);
+            color: white;
+            padding: 30px 40px;
+            margin: -40px -40px 30px -40px;
+            /* Bleed to edges */
+            text-align: center;
+        }
+
+        .name {
+            color: white;
+            font-size: 32px;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .title {
+            color: var(--accent-color, #3b82f6);
+            /* Make accent readable on dark bg, maybe lighten it? */
+            filter: brightness(1.2);
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .contact-info {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+        }
+
+        .contact-info .separator {
+            color: var(--accent-color);
+        }
+
+        .section-title {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            padding-bottom: 6px;
+            margin-bottom: 16px;
+        }
+
+        .job-role {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="resume-container">
+        <!-- Header with Banner -->
+        <header class="resume-header">
+            <h1 class="name">{{name}}</h1>
+            <p class="title">{{current_role}}</p>
+            <div class="contact-info">
+                <span>{{email}}</span>
+                <span class="separator">|</span>
+                <span>{{phone}}</span>
+                <span class="separator">|</span>
+                <span>{{location}}</span>
+                {{#if linkedin}}
+                <span class="separator">|</span>
+                <span>{{linkedin}}</span>
+                {{/if}}
+            </div>
+        </header>
+
+        <!-- Summary -->
+        <section class="section summary-section">
+            <h2 class="section-title">Professional Summary</h2>
+            <p>{{summary}}</p>
+        </section>
+
+        <!-- Experience -->
+        <section class="section experience-section">
+            <h2 class="section-title">Experience</h2>
+            <div class="experience-list">
+                {{experience_html}}
+            </div>
+        </section>
+
+        <!-- Skills -->
+        <section class="section skills-section">
+            <h2 class="section-title">Skills</h2>
+            <p>{{skills}}</p>
+        </section>
+
+        <!-- Education -->
+        <section class="section education-section">
+            <h2 class="section-title">Education</h2>
+            <div class="education-list">
+                {{education_html}}
+            </div>
+        </section>
+    </div>
+</body>
+
+</html>

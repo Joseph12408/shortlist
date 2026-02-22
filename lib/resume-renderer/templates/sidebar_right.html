@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {{name}}</title>
+    <link rel="stylesheet" href="../styles/base.css">
+    <style>
+        /* Right Sidebar Layout Specifics */
+        .resume-container {
+            display: grid;
+            grid-template-columns: 1fr 28%;
+            /* FLIPPED */
+            min-height: 297mm;
+            padding: 0 !important;
+        }
+
+        .sidebar {
+            background-color: #f7f9fc;
+            padding: 40px 20px;
+            color: var(--text-primary);
+            border-left: 1px solid #e5e7eb;
+            /* Changed to border-left */
+            grid-column: 2;
+            /* Explicitly place in second column */
+            grid-row: 1;
+        }
+
+        .main-content {
+            padding: 40px 30px;
+            grid-column: 1;
+            /* Place in first column */
+            grid-row: 1;
+        }
+
+        /* Sidebar Content Styling */
+        .sidebar .section-title {
+            border-bottom: none;
+            color: var(--primary-color, var(--text-primary));
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .contact-item {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        /* Adjustments for narrow column */
+        .sidebar .education-item,
+        .sidebar .skill-category {
+            margin-bottom: 16px;
+        }
+
+        .sidebar .degree {
+            font-size: 14px;
+            display: block;
+        }
+
+        .sidebar .institution {
+            font-size: 13px;
+        }
+
+        .sidebar .job-date {
+            font-size: 12px;
+            display: block;
+            text-align: left;
+            margin-top: 2px;
+        }
+
+        /* Main Content Styling */
+        .main-header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 20px;
+        }
+
+        .name {
+            font-size: 36px;
+            color: var(--primary-color, var(--text-primary));
+            margin-bottom: 8px;
+        }
+
+        .title {
+            font-size: 18px;
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        .summary-section {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="resume-container">
+        <!-- Main Content (First in DOM for accessibility/logic, but visual order handled by grid) -->
+        <!-- Actually for grid column placement, DOM order implies default, but we use explicit grid-column -->
+
+        <!-- Right Sidebar -->
+        <aside class="sidebar">
+            <!-- Contact Info -->
+            <section class="section">
+                <h2 class="section-title">Contact</h2>
+                <div class="contact-info-vertical">
+                    <span class="contact-item">{{email}}</span>
+                    <span class="contact-item">{{phone}}</span>
+                    <span class="contact-item">{{location}}</span>
+                    <span class="contact-item">{{website}}</span>
+                    <span class="contact-item">{{linkedin}}</span>
+                </div>
+            </section>
+
+            <!-- Education -->
+            <section class="section education-section">
+                <h2 class="section-title">Education</h2>
+                <div class="education-list">
+                    {{education_html}}
+                </div>
+            </section>
+
+            <!-- Skills -->
+            <section class="section skills-section">
+                <h2 class="section-title">Skills</h2>
+                <div class="skills-list">
+                    {{skills_html}}
+                </div>
+            </section>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="main-header">
+                <h1 class="name">{{name}}</h1>
+                <p class="title">{{current_role}}</p>
+            </header>
+
+            <!-- Summary -->
+            <section class="section summary-section">
+                <h2 class="section-title">Professional Profile</h2>
+                <p>{{summary}}</p>
+            </section>
+
+            <!-- Experience -->
+            <section class="section experience-section">
+                <h2 class="section-title">Experience</h2>
+                <div class="experience-list">
+                    {{experience_html}}
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+
+</html>

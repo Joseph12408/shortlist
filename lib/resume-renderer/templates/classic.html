@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {{name}}</title>
+    <link rel="stylesheet" href="../styles/base.css">
+    <style>
+        /* Classic Overrides */
+        .resume-header {
+            text-align: center;
+            border-bottom: 2px solid var(--text-primary);
+            padding-bottom: 20px;
+        }
+
+        .section-title {
+            border-bottom: 1px solid #ccc;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        .job-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .job-date {
+            font-style: italic;
+        }
+
+        .separator {
+            display: none;
+        }
+
+        /* Remove bullet separators in header if mapped incorrectly, but we used spans */
+        .contact-info {
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="resume-container">
+        <!-- Header -->
+        <header class="resume-header">
+            <h1 class="name">{{name}}</h1>
+            <p class="title">{{current_role}}</p>
+            <div class="contact-info">
+                <span>{{email}}</span> | <span>{{phone}}</span> | <span>{{location}}</span>
+            </div>
+        </header>
+
+        <!-- Summary -->
+        <section class="section summary-section">
+            <h2 class="section-title">Summary</h2>
+            <p style="text-align: center;">{{summary}}</p>
+        </section>
+
+        <!-- Experience -->
+        <section class="section experience-section">
+            <h2 class="section-title">Experience</h2>
+            <div class="experience-list">
+                {{experience_html}}
+            </div>
+        </section>
+
+        <!-- Skills -->
+        <section class="section skills-section">
+            <h2 class="section-title">Skills</h2>
+            <p style="text-align: center;">{{skills}}</p>
+        </section>
+
+        <!-- Education -->
+        <section class="section education-section">
+            <h2 class="section-title">Education</h2>
+            <div class="education-list">
+                {{education_html}}
+            </div>
+        </section>
+    </div>
+</body>
+
+</html>

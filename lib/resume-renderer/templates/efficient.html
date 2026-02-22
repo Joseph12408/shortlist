@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {{name}}</title>
+    <link rel="stylesheet" href="../styles/base.css">
+    <style>
+        /* Efficient Layout Overrides */
+        :root {
+            --section-spacing: 16px;
+            /* Tighter spacing */
+            --item-spacing: 8px;
+            --page-padding: 30px;
+        }
+
+        .resume-header {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .header-left {
+            max-width: 65%;
+        }
+
+        .header-right {
+            text-align: right;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .name {
+            font-size: 28px;
+            margin-bottom: 2px;
+        }
+
+        .title {
+            font-size: 16px;
+            margin-bottom: 0;
+            color: var(--accent-color);
+        }
+
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            border-bottom: 1px solid #e5e7eb;
+            color: var(--text-primary);
+            font-weight: 800;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .job-role {
+            font-size: 15px;
+        }
+
+        .job-description {
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .job-description li {
+            margin-bottom: 1px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="resume-container">
+        <!-- Efficient Header: Name/Title Left, Contact Right -->
+        <header class="resume-header">
+            <div class="header-left">
+                <h1 class="name">{{name}}</h1>
+                <p class="title">{{current_role}}</p>
+            </div>
+            <div class="header-right">
+                <div class="contact-info">
+                    <span>{{email}}</span>
+                    <span>{{phone}}</span>
+                    <span>{{location}}</span>
+                    <span>{{website}}</span>
+                    <span>{{linkedin}}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Summary -->
+        <section class="section summary-section">
+            <h2 class="section-title">Professional Summary</h2>
+            <p>{{summary}}</p>
+        </section>
+
+        <!-- Experience -->
+        <section class="section experience-section">
+            <h2 class="section-title">Experience</h2>
+            <div class="experience-list">
+                {{experience_html}}
+            </div>
+        </section>
+
+        <!-- Education -->
+        <section class="section education-section">
+            <h2 class="section-title">Education</h2>
+            <div class="education-list">
+                {{education_html}}
+            </div>
+        </section>
+
+        <!-- Skills -->
+        <section class="section skills-section">
+            <h2 class="section-title">Skills</h2>
+            <p>{{skills}}</p>
+        </section>
+    </div>
+</body>
+
+</html>
