@@ -76,40 +76,16 @@ export function Pricing() {
                                     <Check className="h-4 w-4 text-primary" />
                                     <span>Unlimited PDF & DOCX Exports</span>
                                 </li>
-                                {plans.map((plan, index) => (
-                                    <Card key={index} className={`flex flex-col ${plan.popular ? 'border-primary shadow-lg bg-primary/5 relative overflow-hidden' : 'border-border/50'}`}>
-                                        {plan.popular && (
-                                            <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">
-                                                POPULAR
-                                            </div>
-                                        )}
-                                        <CardHeader>
-                                            <CardTitle className={`text-2xl ${plan.popular ? 'text-primary' : ''}`}>{plan.name}</CardTitle>
-                                            <CardDescription>{plan.description}</CardDescription>
-                                            <div className="mt-4">
-                                                <span className="text-4xl font-bold">{plan.price}</span>
-                                                {plan.price !== "$0" && <span className="text-muted-foreground">/month</span>}
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="flex-1">
-                                            <ul className="space-y-3">
-                                                {plan.features.map((feature, featureIndex) => (
-                                                    <li key={featureIndex} className="flex items-center gap-2">
-                                                        <Check className="h-4 w-4 text-primary" />
-                                                        <span>{feature}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </CardContent>
-                                        <CardFooter>
-                                            <Button className="w-full" variant={plan.popular ? 'default' : 'outline'} asChild>
-                                                <a href="/builder">{plan.cta}</a>
-                                            </Button>
-                                        </CardFooter>
-                                    </Card>
-                                ))}
-                            </div>
-                        </div>
-                    </section>
-                    );
+                            </ul>
+                        </CardContent>
+                        <CardFooter>
+                            <Button className="w-full" asChild>
+                                <a href="/builder">Get Pro</a>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+            </div>
+        </section>
+    );
 }
