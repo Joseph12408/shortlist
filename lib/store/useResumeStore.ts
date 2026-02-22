@@ -13,6 +13,28 @@ import { api } from '@/convex/_generated/api';
 // For now, we assume schema matches types almost 1:1, but verify ID strings vs proper IDs.
 // Schema expects string IDs for sub-items? Yes.
 
+const initialResume: Resume = {
+    id: 'draft',
+    title: 'Untitled Resume',
+    profile: {
+        fullName: '',
+        email: '',
+        phone: '',
+        location: '',
+        website: '',
+        linkedin: '',
+        summary: '',
+        headline: '',
+        jobTitle: '',
+    },
+    education: [],
+    experience: [],
+    leadership: [],
+    projects: [],
+    skills: [],
+    customStyles: THEME_PRESETS.modern,
+};
+
 export const useResumeStore = create<ResumeState>()(
     // We keep persist for redundant offline cache for now, but primary source of truth is Convex
     persist(
