@@ -20,7 +20,7 @@ const ResumePreview = dynamic(
     { ssr: false, loading: () => <div className="w-[210mm] min-h-[297mm] bg-white animate-pulse" /> }
 );
 
-export default function BuilderPage() {
+function BuilderContent() {
     // 1. Init Persistence & Store
     useResumePersistence();
     const {
@@ -123,15 +123,41 @@ export default function BuilderPage() {
             const { viewMode, resume, coverLetter } = store;
 
             let endpoint = '/api/download-pdf';
-            // ... (rest of logic)
-            // ...
-            // ...
+            let bodyData: any = {};
+
+            if (viewMode === 'cover-letter') {
+                endpoint = '/api/download-cover-letter';
+                bodyData = { coverLetter };
+            } else {
+                endpoint = '/api/download-pdf';
+                bodyData = { resume };
+            }
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(bodyData)
             });
-            // ... (rest of response handling)
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (errorData.error === 'usage_limit_reached') {
+                    setShowUpgrade(true);
+                    return;
+                }
+                throw new Error(errorData.error || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = viewMode === 'cover-letter' ? 'cover_letter.pdf' : 'resume.pdf';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
         } catch (error) {
             console.error('Export failed:', error);
             // If it was the limit error specifically, we handled it above, 
@@ -217,5 +243,15 @@ export default function BuilderPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+import { Suspense } from "react";
+
+export default function BuilderPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading builder...</div>}>
+            <BuilderContent />
+        </Suspense>
     );
 }
