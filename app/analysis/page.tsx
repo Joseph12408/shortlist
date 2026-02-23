@@ -217,7 +217,7 @@ export default function AnalysisPage() {
                         </div>
 
 
-                        {savedResumes.length > 0 && (
+                        {(savedResumes?.length || 0) > 0 && (
                             <div className="w-full max-w-xl mt-8">
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Or analyze a saved resume</h3>
                                 <div className="grid gap-3">
@@ -341,7 +341,7 @@ export default function AnalysisPage() {
                         <div className="space-y-8">
                             <h3 className="text-2xl font-bold">Detailed Feedback</h3>
 
-                            {missingKeywords.length > 0 && (
+                            {(missingKeywords?.length || 0) > 0 && (
                                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-red-100 dark:border-red-900/30 p-6 flex gap-4">
                                     <div className="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg h-fit text-red-600">
                                         <AlertCircle className="w-6 h-6" />
@@ -363,7 +363,7 @@ export default function AnalysisPage() {
                             {/* Render feedback grouped by category if available */}
                             {useResumeStore.getState().categoryScores ? (
                                 Object.values(useResumeStore.getState().categoryScores).map((cat) => (
-                                    cat.feedback.length > 0 && (
+                                    (cat.feedback?.length || 0) > 0 && (
                                         <div key={cat.name} className="space-y-4">
                                             <h4 className="text-lg font-semibold border-b pb-2">{cat.name}</h4>
                                             {cat.feedback.map((item, i) => (
@@ -381,7 +381,7 @@ export default function AnalysisPage() {
                                 ))
                             ) : (
                                 // Fallback for old feedback structure
-                                atsFeedback.map((item, i) => (
+                                atsFeedback?.map((item, i) => (
                                     <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border p-6 flex gap-4">
                                         <div className={`p-2 rounded-lg h-fit text-white ${item.type === 'error' ? 'bg-red-500' : item.type === 'warning' ? 'bg-yellow-500' : 'bg-green-500'}`}>
                                             {item.type === 'success' ? <CheckCircle2 className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
