@@ -58,7 +58,7 @@ export default function CoverLettersPage() {
 
             <main className="container mx-auto px-6 py-12">
 
-                {savedCoverLetters.length === 0 ? (
+                {(!savedCoverLetters || savedCoverLetters.length === 0) ? (
                     <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
                         <div className="h-16 w-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
                             <FileType className="w-8 h-8 text-slate-400" />

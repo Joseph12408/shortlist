@@ -26,7 +26,7 @@ export default function DashboardPage() {
 
     // calculate average score
     // calculate average score
-    const scoredResumes = savedResumes.filter(r => (r.atsScore || 0) > 0);
+    const scoredResumes = (savedResumes || []).filter(r => (r.atsScore || 0) > 0);
     const avgScore = scoredResumes.length > 0
         ? Math.round(scoredResumes.reduce((acc, curr) => acc + (curr.atsScore || 0), 0) / scoredResumes.length)
         : 0;

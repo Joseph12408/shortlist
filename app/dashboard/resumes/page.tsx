@@ -60,7 +60,7 @@ export default function ResumesPage() {
 
             <main className="container mx-auto px-6 py-12">
 
-                {savedResumes.length === 0 ? (
+                {(!savedResumes || savedResumes.length === 0) ? (
                     <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
                         <div className="h-16 w-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
                             <FileText className="w-8 h-8 text-slate-400" />
@@ -86,7 +86,7 @@ export default function ResumesPage() {
                         </div>
 
                         {/* Resume Cards */}
-                        {savedResumes.map((resume, index) => (
+                        {(savedResumes || []).map((resume, index) => (
                             <div key={`${resume.id}-${index}`} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-md transition-all flex flex-col h-64">
                                 <div className="h-32 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 border-b p-6 relative group">
                                     <FileText className="w-12 h-12 text-slate-300 absolute bottom-4 right-4 group-hover:scale-110 transition-transform" />
