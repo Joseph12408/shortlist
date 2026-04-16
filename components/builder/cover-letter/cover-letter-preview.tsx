@@ -13,6 +13,14 @@ export function CoverLetterPreview() {
         day: 'numeric'
     });
 
+    const toTitleCase = (str: string) => {
+        if (!str) return "Candidate";
+        return str.replace(
+            /\w\S*/g,
+            text => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase()
+        );
+    };
+
     return (
         <div className="w-[210mm] min-h-[297mm] bg-white text-slate-900 mx-auto shadow-sm print:shadow-none bg-white p-[25mm] flex flex-col font-serif">
 
@@ -97,11 +105,11 @@ export function CoverLetterPreview() {
 
                     {/* Cursive Signature */}
                     <div className="text-3xl text-slate-900 mb-2" style={{ fontFamily: '"Brush Script MT", "Segoe Script", cursive' }}>
-                        {profile.fullName || "Candidate"}
+                        {toTitleCase(profile.fullName)}
                     </div>
 
                     <p className="font-bold text-slate-900 mt-1">
-                        {profile.fullName || "Your Name"}
+                        {toTitleCase(profile.fullName)}
                     </p>
                 </div>
             </div>

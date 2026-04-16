@@ -7,11 +7,72 @@ import { THEME_PRESETS } from '../themes';
 import { convex } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
 
-// ... (existing interface ResumeState) ...
+export interface ResumeState {
+    savedResumes: Resume[];
+    savedCoverLetters: any[];
+    resume: Resume;
+    coverLetter: any;
+    isLoading: boolean;
+    initialLoadDone: boolean;
+    jobDescription?: string;
+    atsScore?: number;
+    categoryScores?: Record<string, any>;
+    atsFeedback?: any[];
+    matchedKeywords?: string[];
+    missingKeywords?: string[];
+    stats: { totalReviews: number };
+    referenceResume?: Resume | null;
+    viewMode?: 'resume' | 'cover-letter' | 'design' | string;
+    isPreviewVisible?: boolean;
 
-// Helper to remove internal fields or format data for Convex if needed
-// For now, we assume schema matches types almost 1:1, but verify ID strings vs proper IDs.
-// Schema expects string IDs for sub-items? Yes.
+    // Actions
+    initialize: () => Promise<void>;
+    saveCurrentResume: () => Promise<void>;
+    resetBuilderSession: () => void;
+    setResume: (resume: Resume) => void;
+    setResumeTitle: (title: string) => void;
+    loadResume: (id: string) => void;
+    createNewResume: () => void;
+    deleteResume: (id: string) => Promise<void>;
+    
+    // Cover Letter actions
+    createNewCoverLetter: () => void;
+    deleteCoverLetter: (id: string) => void;
+    updateCoverLetter: (data: any) => void;
+    loadCoverLetter: (id: string) => void;
+    generateCoverLetterWithAI: () => Promise<void>;
+    
+    // Form actions
+    updateProfile: (profile: Partial<ResumeProfile>) => void;
+    addEducation: () => void;
+    updateEducation: (id: string, edu: Partial<ResumeEducation>) => void;
+    removeEducation: (id: string) => void;
+    addExperience: () => void;
+    updateExperience: (id: string, exp: Partial<ResumeExperience>) => void;
+    removeExperience: (id: string) => void;
+    addProject: () => void;
+    updateProject: (id: string, proj: Partial<ResumeProject>) => void;
+    removeProject: (id: string) => void;
+    addSkill: () => void;
+    updateSkill: (id: string, skill: Partial<ResumeSkill>) => void;
+    removeSkill: (id: string) => void;
+    addLeadership: () => void;
+    updateLeadership: (id: string, leadership: Partial<ResumeExperience>) => void;
+    removeLeadership: (id: string) => void;
+    
+    // AI
+    setJobDescription: (text: string) => void;
+    runATSAnalysis: () => void;
+    improveResumeWithAI: () => Promise<void>;
+    
+    incrementReviewCount: () => void;
+    resetStats: () => void;
+    setTemplate: (theme: string) => void;
+    setReferenceResume: (r: Resume | null) => void;
+    setViewMode: (mode: string) => void;
+    setPreviewVisible: (visible: boolean) => void;
+    setColors: (primary: string, accent: string) => void;
+}
 
 const initialResume: Resume = {
     id: 'draft',
@@ -32,21 +93,32 @@ const initialResume: Resume = {
     leadership: [],
     projects: [],
     skills: [],
-    customStyles: THEME_PRESETS.modern,
+    customStyles: THEME_PRESETS[2].tokens, // 2 is San Francisco which has theme 'modern'
 };
 
 export const useResumeStore = create<ResumeState>()(
-    // We keep persist for redundant offline cache for now, but primary source of truth is Convex
     persist(
         (set, get) => ({
-            // ... (existing state) ...
+            savedResumes: [],
+            savedCoverLetters: [],
             resume: {
                 ...initialResume,
-                // ...
             },
-            // ...
-
-            // Persistence
+            coverLetter: {
+                title: 'Untitled Cover Letter',
+                jobTitle: '',
+                company: '',
+                recipient: '',
+                body: ''
+            },
+            viewMode: 'resume',
+            jobDescription: '',
+            atsScore: 0,
+            categoryScores: {},
+            atsFeedback: [],
+            matchedKeywords: [],
+            missingKeywords: [],
+            stats: { totalReviews: 0 },
             isLoading: true,
             initialLoadDone: false,
 
@@ -54,21 +126,22 @@ export const useResumeStore = create<ResumeState>()(
                 set({ isLoading: true });
 
                 try {
-                    // Fetch resumes using the shared client
-                    // Note: Auth token must be set on the client for this to work for protected queries.
-                    // If called too early before Clerk authenticates, this might return empty or error.
-                    // Ideally, we should use a reactive subscription or check connection status.
-                    // For now, we try once.
-
                     const resumes = await convex.query(api.resumes.list, {});
 
                     if (resumes && resumes.length > 0) {
-                        // Cast to Resume[] (Schema matches types mostly)
                         const loadedResumes = resumes as unknown as Resume[];
+                        const currentResume = get().resume;
+                        
+                        const hasActiveData = Boolean(
+                            currentResume.profile?.fullName ||
+                            (currentResume.experience && currentResume.experience.length > 0) ||
+                            (currentResume.education && currentResume.education.length > 0) ||
+                            (currentResume.skills && currentResume.skills.length > 0)
+                        );
 
                         set({
                             savedResumes: loadedResumes,
-                            resume: loadedResumes[0], // Load the first one
+                            resume: hasActiveData ? currentResume : loadedResumes[0], 
                             initialLoadDone: true,
                             isLoading: false
                         });
@@ -84,12 +157,10 @@ export const useResumeStore = create<ResumeState>()(
                 }
             },
 
-            // Override saveCurrentResume
             saveCurrentResume: async () => {
                 const { resume, savedResumes, atsScore } = get();
                 const resumeWithScore = { ...resume, atsScore };
 
-                // Optimistic update local
                 const index = savedResumes.findIndex(r => r.id === (resume.id || ''));
                 let newSaved;
                 if (index >= 0) {
@@ -100,70 +171,78 @@ export const useResumeStore = create<ResumeState>()(
                 }
                 set({ savedResumes: newSaved });
 
-                // Sync to Convex
                 try {
-                    // If ID is a valid Convex ID, use update.
-                    // Our IDs are UUIDs currently for drafts.
-                    // If we have a backend ID (usually 32 chars base62 for Convex?)
-                    // We need to distinguish.
-                    // Strategy: 
-                    // 1. Try to find existing by title/userId? No.
-                    // 2. Just create new if draft?
-
-                    // For now, let's just log. Full sync requires converting UUIDs to Convex IDs. 
-                    // Or we store the UUID in Convex as `externalId`?
-                    // Changing logic: We will implement proper sync later.
-                    // For now, keep local persistence working.
                     const { resume } = get();
-                    // Identify if it's a draft (UUID) or a real Convex ID
-                    // Convex IDs are alphanumeric, UUIDs have dashes. 
-                    // Or simpler: if id is 'draft' or length is 36 (standard UUID)
-                    const isDraft = resume.id === 'draft' || (resume.id && resume.id.length === 36);
+                    const isDraft = !resume.id || resume.id === 'draft' || resume.id.includes('-');
 
                     if (!isDraft) {
-                        // Update existing
                         await convex.mutation(api.resumes.update, {
                             id: resume.id as any,
                             title: resume.title,
                             profile: resume.profile,
                             education: resume.education,
                             experience: resume.experience,
-                            leadership: resume.leadership,
+                            leadership: resume.leadership || [],
                             projects: resume.projects,
                             skills: resume.skills,
                             customStyles: resume.customStyles,
                             atsScore: atsScore,
                         });
                     } else {
-                        // Create new
                         const newId = await convex.mutation(api.resumes.create, {
-                            title: resume.title,
+                            title: resume.title || 'Untitled Resume',
                             profile: resume.profile,
-                            education: resume.education,
-                            experience: resume.experience,
-                            leadership: resume.leadership,
-                            projects: resume.projects,
-                            skills: resume.skills,
+                            education: resume.education || [],
+                            experience: resume.experience || [],
+                            leadership: resume.leadership || [],
+                            projects: resume.projects || [],
+                            skills: resume.skills || [],
                             customStyles: resume.customStyles,
-                            atsScore: atsScore,
                         });
 
-                        // Update local ID with real Convex ID
                         const updatedResume = { ...resume, id: newId };
                         set({ resume: updatedResume });
 
-                        // Update saved list to reflect new ID
                         const { savedResumes } = get();
                         const updatedSaved = savedResumes.map(r => r.id === resume.id ? updatedResume : r);
                         set({ savedResumes: updatedSaved });
                     }
 
-                } catch (err) {
-                    console.error("Failed to sync to Convex", err);
+                } catch (err: any) {
+                    // Silently handle auth failures — the Convex client may not have
+                    // the Clerk JWT yet if the user just signed in. Local persistence
+                    // still works via Zustand's persist middleware.
+                    const errorString = String(err);
+                    if (errorString.includes('Unauthenticated') || errorString.includes('Not authenticated')) {
+                        console.warn("Convex sync skipped (not authenticated yet). Data saved locally.");
+                    } else {
+                        console.error("Failed to sync to Convex", err);
+                    }
                 }
             },
 
             // Resume Management Actions
+            setResume: (newResume: Resume) => {
+                set((state) => ({ 
+                    resume: {
+                        ...initialResume,
+                        ...state.resume,
+                        ...newResume,
+                        profile: {
+                            ...initialResume.profile,
+                            ...state.resume?.profile,
+                            ...newResume?.profile,
+                        },
+                        education: newResume.education || state.resume?.education || initialResume.education,
+                        experience: newResume.experience || state.resume?.experience || initialResume.experience,
+                        skills: newResume.skills || state.resume?.skills || initialResume.skills,
+                        projects: newResume.projects || state.resume?.projects || initialResume.projects,
+                        leadership: newResume.leadership || state.resume?.leadership || initialResume.leadership,
+                        customStyles: newResume.customStyles || state.resume?.customStyles || initialResume.customStyles
+                    } as Resume
+                }));
+                get().saveCurrentResume();
+            },
             setResumeTitle: (title) => {
                 set((state) => ({
                     resume: { ...state.resume, title }
@@ -182,7 +261,7 @@ export const useResumeStore = create<ResumeState>()(
 
             createNewResume: () => {
                 const { savedResumes } = get();
-                const count = savedResumes.length + 1;
+                const count = (savedResumes || []).length + 1;
                 const newResume = {
                     ...initialResume,
                     id: uuidv4(), // Draft ID
@@ -217,6 +296,30 @@ export const useResumeStore = create<ResumeState>()(
                     // Optionally revert local state if failed? 
                 }
             },
+
+            createNewCoverLetter: () => {
+                const { savedCoverLetters } = get();
+                const count = (savedCoverLetters || []).length + 1;
+                const newCL = {
+                    id: uuidv4(),
+                    title: `Cover Letter #${count}`,
+                    jobTitle: '',
+                    company: '',
+                    recipient: '',
+                    body: '',
+                };
+                set({ coverLetter: newCL, savedCoverLetters: [...(savedCoverLetters || []), newCL] });
+            },
+
+            deleteCoverLetter: (id: string) => {
+                const { savedCoverLetters, coverLetter } = get();
+                const newSaved = (savedCoverLetters || []).filter((cl: any) => cl.id !== id);
+                set({ savedCoverLetters: newSaved });
+                if (coverLetter?.id === id) {
+                    set({ coverLetter: { title: 'Untitled Cover Letter', jobTitle: '', company: '', recipient: '', body: '' } });
+                }
+            },
+
             updateProfile: (profile) => {
                 set((state) => ({
                     resume: { ...state.resume, profile: { ...state.resume.profile, ...profile } },
@@ -420,7 +523,7 @@ export const useResumeStore = create<ResumeState>()(
                 const state = get();
                 // Simple debounce could go here if needed, but for now we just run it.
                 // Analysis is fast enough (regex on small text).
-                const result = analyzeResume(state.resume, state.jobDescription);
+                const result = analyzeResume(state.resume, state.jobDescription || '');
 
                 // Only increment stats if score > 0 to avoid counting initial empty analysis
                 if (result.overallScore > 0) {
@@ -452,7 +555,8 @@ export const useResumeStore = create<ResumeState>()(
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             resume: state.resume,
-                            stylePrompt: 'Professional and modern'
+                            jobDescription: state.jobDescription, // Pass JD for optimization
+                            stylePrompt: state.resume.customStyles?.theme || 'Professional and modern'
                         })
                     });
 
@@ -468,25 +572,25 @@ export const useResumeStore = create<ResumeState>()(
                                 ...state.resume.profile,
                                 ...(data.resume.profile || {})
                             },
-                            experience: Array.isArray(data.resume.experience) ? data.resume.experience.map((exp: any, i: number) => ({
+                            experience: Array.isArray(data.resume.experience) && data.resume.experience.length > 0 ? data.resume.experience.map((exp: any, i: number) => ({
                                 ...exp,
                                 id: state.resume.experience[i]?.id || uuidv4(),
                                 description: exp.description || ''
-                            })) : [],
-                            education: Array.isArray(data.resume.education) ? data.resume.education.map((edu: any, i: number) => ({
+                            })) : state.resume.experience,
+                            education: Array.isArray(data.resume.education) && data.resume.education.length > 0 ? data.resume.education.map((edu: any, i: number) => ({
                                 ...edu,
                                 id: state.resume.education[i]?.id || uuidv4()
-                            })) : [],
-                            skills: Array.isArray(data.resume.skills) ? data.resume.skills.map((skill: any, i: number) => ({
+                            })) : state.resume.education,
+                            skills: Array.isArray(data.resume.skills) && data.resume.skills.length > 0 ? data.resume.skills.map((skill: any, i: number) => ({
                                 ...skill,
                                 id: state.resume.skills[i]?.id || uuidv4(),
                                 skills: Array.isArray(skill.skills) ? skill.skills : []
-                            })) : [],
-                            projects: Array.isArray(data.resume.projects) ? data.resume.projects.map((proj: any, i: number) => ({
+                            })) : state.resume.skills,
+                            projects: Array.isArray(data.resume.projects) && data.resume.projects.length > 0 ? data.resume.projects.map((proj: any, i: number) => ({
                                 ...proj,
                                 id: state.resume.projects[i]?.id || uuidv4(),
                                 description: proj.description || ''
-                            })) : [],
+                            })) : state.resume.projects,
 
                             customStyles: data.resume.customStyles || state.resume.customStyles
                         };
@@ -510,6 +614,51 @@ export const useResumeStore = create<ResumeState>()(
                 }
             },
 
+            // --- Cover Letter Logic ---
+            updateCoverLetter: (data: any) => {
+                set((state) => ({
+                    coverLetter: { ...state.coverLetter, ...data }
+                }));
+            },
+            loadCoverLetter: (id: string) => {
+                const { savedCoverLetters } = get();
+                const found = savedCoverLetters.find(c => c.id === id);
+                if (found) set({ coverLetter: found });
+            },
+            generateCoverLetterWithAI: async () => {
+                set({ isLoading: true });
+                const state = get();
+
+                try {
+                    const response = await fetch('/api/generate-cover-letter', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            resume: state.resume,
+                            jobTitle: state.coverLetter.jobTitle,
+                            company: state.coverLetter.company,
+                            tone: 'Professional'
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success && data.content) {
+                        set((state) => ({
+                            coverLetter: {
+                                ...state.coverLetter,
+                                body: data.content
+                            }
+                        }));
+                    } else {
+                        alert(data.error || 'Failed to generate cover letter');
+                    }
+                } catch (e: any) {
+                    alert('Error reaching AI: ' + e.message);
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
             incrementReviewCount: () => {
                 set((state) => ({
                     stats: {
@@ -524,13 +673,57 @@ export const useResumeStore = create<ResumeState>()(
                     }
                 });
             },
+            setTemplate: (theme: string) => {
+                const preset = THEME_PRESETS.find(t => t.tokens.theme === theme || t.id === theme);
+                if (preset) {
+                    set((state) => ({
+                        resume: {
+                            ...state.resume,
+                            customStyles: {
+                                ...preset.tokens,
+                                // Maintain the user's custom color if they picked one
+                                primaryColor: state.resume.customStyles?.primaryColor || preset.tokens.primaryColor,
+                                accentColor: state.resume.customStyles?.accentColor || preset.tokens.accentColor,
+                            }
+                        }
+                    }));
+                }
+            },
+            setColors: (primary: string, accent: string) => {
+                set((state) => ({
+                    resume: {
+                        ...state.resume,
+                        customStyles: {
+                            ...state.resume.customStyles,
+                            primaryColor: primary,
+                            accentColor: accent,
+                        } as any
+                    }
+                }));
+            },
+            resetBuilderSession: () => {
+                set({
+                    resume: { ...initialResume, id: 'draft' },
+                    coverLetter: { title: 'Untitled Cover Letter', jobTitle: '', company: '', recipient: '', body: '' },
+                    viewMode: 'resume',
+                    jobDescription: '',
+                    atsScore: 0,
+                    categoryScores: {},
+                    atsFeedback: [],
+                    matchedKeywords: [],
+                    missingKeywords: [],
+                });
+            },
+            setReferenceResume: (r: Resume | null) => set({ referenceResume: r }),
+            setViewMode: (mode: string) => set({ viewMode: mode }),
+            setPreviewVisible: (visible: boolean) => set({ isPreviewVisible: visible }),
         }), {
-        name: 'shortlist-storage', // name of the item in the storage (must be unique)
+        name: 'shortlist-storage',
         partialize: (state) => ({
             savedResumes: state.savedResumes,
             savedCoverLetters: state.savedCoverLetters,
-            stats: state.stats, // Persist global stats
-            // We can optionally persist the 'resume' (current draft) too if we want
-            resume: state.resume
+            stats: state.stats,
+            // resume, coverLetter, viewMode are NOT persisted.
+            // They are session-scoped and reset on each builder visit.
         }),
     }));

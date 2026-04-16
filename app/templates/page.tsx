@@ -9,7 +9,8 @@ import { Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function TemplatesPage() {
-    const { setTemplate, subscriptionStatus, selectedTemplate } = useResumeStore();
+    const { setTemplate, subscriptionStatus, resume } = useResumeStore();
+    const currentTheme = resume.customStyles?.theme || 'modern';
     const router = useRouter();
 
     const templates = [

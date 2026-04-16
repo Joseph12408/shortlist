@@ -133,5 +133,6 @@ export const generateDocx = async (resume: Resume) => {
     });
 
     const blob = await Packer.toBlob(doc);
-    saveAs(blob, `${profile.fullName.replace(/\s+/g, '_')}_Resume.docx`);
+    const baseName = profile.fullName || 'resume';
+    saveAs(blob, `${baseName.replace(/\s+/g, '-').toLowerCase()}.docx`);
 };

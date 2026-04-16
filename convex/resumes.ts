@@ -220,6 +220,7 @@ export const list = query({
         return await ctx.db
             .query("resumes")
             .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .order("desc")
             .collect();
     },
 });

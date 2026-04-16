@@ -16,7 +16,7 @@ export interface ThemeConfig {
         headingWeight: string;
         bodyWeight: string;
         sectionDividerStyle: 'solid_line' | 'dashed_line' | 'spacer' | 'dotted' | 'double_line' | 'none';
-        theme: 'modern' | 'classic' | 'minimal' | 'efficient' | 'sidebar' | 'sidebar_right';
+        theme: 'modern' | 'classic' | 'minimal' | 'efficient' | 'sidebar' | 'sidebar_right' | 'standard' | 'banner';
     }
 }
 
@@ -34,6 +34,36 @@ export const THEME_PRESETS: ThemeConfig[] = [
             headingWeight: '400',
             bodyWeight: '400',
             sectionDividerStyle: 'spacer'
+        }
+    },
+    {
+        id: 'standard',
+        label: 'Standard Layout',
+        description: 'Traditional ATS Compatible',
+        tokens: {
+            theme: 'standard',
+            fontHeading: 'Inter',
+            fontBody: 'Inter',
+            primaryColor: '#000000',
+            accentColor: '#3B82F6',
+            headingWeight: '600',
+            bodyWeight: '400',
+            sectionDividerStyle: 'solid_line'
+        }
+    },
+    {
+        id: 'banner',
+        label: 'Executive Banner',
+        description: 'Full-width Accent Header',
+        tokens: {
+            theme: 'banner',
+            fontHeading: 'Outfit',
+            fontBody: 'Inter',
+            primaryColor: '#111827',
+            accentColor: '#1e3a8a',
+            headingWeight: '700',
+            bodyWeight: '400',
+            sectionDividerStyle: 'none'
         }
     },
     {

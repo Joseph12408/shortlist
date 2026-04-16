@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Sparkles, UserCircle, Crown } from "lucide-react";
+import { Menu, Sparkles, UserCircle, Crown, LayoutDashboard, FileText, BarChart3, Settings } from "lucide-react";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { useState } from "react";
 import { Paywall } from "@/components/subscription/Paywall";
@@ -43,18 +43,29 @@ export function Header() {
                 </Link>
 
                 <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-                    <Link href="/#features" className="text-muted-foreground hover:text-foreground transition-colors">
-                        Features
-                    </Link>
-                    <Link href="/#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
-                        How it Works
-                    </Link>
-                    <Link href="/#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                        Pricing
-                    </Link>
+                    {/* Links shown ONLY when signed OUT */}
+                    <SignedOut>
+                        <Link href="/#features" className="text-muted-foreground hover:text-foreground transition-colors">
+                            Features
+                        </Link>
+                        <Link href="/#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
+                            How it Works
+                        </Link>
+                        <Link href="/#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                            Pricing
+                        </Link>
+                    </SignedOut>
+
+                    {/* Links shown ONLY when signed IN */}
                     <SignedIn>
-                        <Link href="/dashboard" className="text-primary font-semibold hover:text-primary/80 transition-colors ml-4">
+                        <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
                             Dashboard
+                        </Link>
+                        <Link href="/analysis" className="text-muted-foreground hover:text-foreground transition-colors">
+                            AI Review
+                        </Link>
+                        <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                            Pricing
                         </Link>
                     </SignedIn>
 
@@ -95,26 +106,32 @@ export function Header() {
                                 <span className="font-heading text-lg font-bold">Shortlist</span>
                             </Link>
                             <nav className="flex flex-col gap-4">
-                                <Link href="/#features" className="text-base font-medium">
-                                    Features
-                                </Link>
-                                <Link href="/#how-it-works" className="text-base font-medium">
-                                    How it Works
-                                </Link>
-                                <Link href="/#pricing" className="text-base font-medium">
-                                    Pricing
-                                </Link>
+                                {/* Mobile: Signed OUT links */}
+                                <SignedOut>
+                                    <Link href="/#features" className="text-base font-medium">
+                                        Features
+                                    </Link>
+                                    <Link href="/#how-it-works" className="text-base font-medium">
+                                        How it Works
+                                    </Link>
+                                    <Link href="/#pricing" className="text-base font-medium">
+                                        Pricing
+                                    </Link>
+                                </SignedOut>
+
+                                {/* Mobile: Signed IN links */}
                                 <SignedIn>
                                     <Link href="/dashboard" className="text-base font-medium text-primary">
                                         Dashboard
                                     </Link>
-                                    <Link href="/dashboard/resumes" className="text-base font-medium text-muted-foreground pl-4">
-                                        My Resumes
+                                    <Link href="/analysis" className="text-base font-medium text-muted-foreground">
+                                        AI Review
                                     </Link>
-                                    <Link href="/account" className="text-base font-medium text-muted-foreground pl-4">
-                                        Account
+                                    <Link href="/pricing" className="text-base font-medium text-muted-foreground">
+                                        Pricing
                                     </Link>
                                 </SignedIn>
+
                                 <div className="flex flex-col gap-2 mt-4">
                                     <SignedOut>
                                         <SignInButton mode="modal">

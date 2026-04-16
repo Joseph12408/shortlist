@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { Sparkles, Loader2 } from "lucide-react";
 import React from 'react';
+import { useRouter } from "next/navigation";
 
 export function CoverLetterForm() {
     const {
         coverLetter,
         updateCoverLetter,
         generateCoverLetterWithAI,
-        isLoading,
-        checkFeatureAccess
+        isLoading
     } = useResumeStore();
     const [isGenerating, setIsGenerating] = React.useState(false); // This state might become redundant if generateCoverLetterWithAI handles loading internally
     const router = useRouter(); // Initialize useRouter

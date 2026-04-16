@@ -1,3 +1,4 @@
+/*
 import { Purchases, LogLevel } from "@revenuecat/purchases-js";
 
 const API_KEY = process.env.NEXT_PUBLIC_REVENUECAT_KEY;
@@ -42,3 +43,5 @@ class RevenueCatService {
 }
 
 export const revenueCatService = RevenueCatService.getInstance();
+*/
+export { };

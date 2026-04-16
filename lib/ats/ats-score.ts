@@ -35,23 +35,43 @@ export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalys
     // --- 1. Content Quality (30 pts) ---
     // Metrics: Usage of numbers, results-oriented language
     // Depth: Experience length, descriptions
+    // Action verbs and summary presence
 
     if (resume.experience.length > 0) {
-        // Check for quantifiable metrics
-        const hasNumbers = resume.experience.some(e => /\d+|%|\$|increased|reduced|saved|grew/.test(e.description?.toLowerCase() || ''));
-        if (hasNumbers) {
-            contentScore += 15;
-            feedback.push({ category: 'Content', message: 'Great use of quantifiable metrics/action verbs.', type: 'success', scoreImpact: 15 });
-        } else {
+        // Quantifiable metrics across all entries
+        let metricsCount = 0;
+        let actionVerbCount = 0;
+        resume.experience.forEach(e => {
+            const desc = e.description?.toLowerCase() || '';
+            if (/\d+|%|\$|increased|reduced|saved|grew|led/.test(desc)) metricsCount++;
+            // Basic check if bullets start with action verbs (approximate by looking for typical verbs at newline/starts)
+            if (/^(managed|led|designed|developed|built|created|improved|increased|implemented|delivered)/im.test(desc)) actionVerbCount++;
+        });
+
+        const metricRatio = metricsCount / resume.experience.length;
+        if (metricRatio >= 0.8) {
+            contentScore += 10;
+            feedback.push({ category: 'Content', message: 'Excellent use of quantifiable metrics across roles.', type: 'success', scoreImpact: 10 });
+        } else if (metricRatio >= 0.4) {
             contentScore += 5;
-            feedback.push({ category: 'Content', message: 'Add numbers, percentages, or dollar amounts to quantify achievements.', type: 'warning', scoreImpact: 5 });
+            feedback.push({ category: 'Content', message: 'Good metrics, but quantify achievements in more roles.', type: 'warning', scoreImpact: 5 });
+        } else {
+            feedback.push({ category: 'Content', message: 'Add numbers, percentages, or dollar amounts to quantify achievements.', type: 'error', scoreImpact: 0 });
+        }
+
+        // Action verb usage
+        if (actionVerbCount > 0) {
+            contentScore += 5;
+            feedback.push({ category: 'Content', message: 'Strong action verbs detected at start of bullets.', type: 'success', scoreImpact: 5 });
+        } else {
+            feedback.push({ category: 'Content', message: 'Start bullet points with strong action verbs (e.g., Managed, Delivered).', type: 'warning', scoreImpact: 0 });
         }
 
         // Check for depth (description length)
         const avgLength = resume.experience.reduce((acc, curr) => acc + (curr.description?.length || 0), 0) / resume.experience.length;
-        if (avgLength > 100) {
-            contentScore += 15;
-            feedback.push({ category: 'Content', message: 'Good depth in role descriptions.', type: 'success', scoreImpact: 15 });
+        if (avgLength > 150) {
+            contentScore += 10;
+            feedback.push({ category: 'Content', message: 'Good depth in role descriptions.', type: 'success', scoreImpact: 10 });
         } else {
             contentScore += 5;
             feedback.push({ category: 'Content', message: 'Expand on role descriptions. Explain "how" and "why", not just "what".', type: 'warning', scoreImpact: 5 });
@@ -60,14 +80,19 @@ export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalys
         feedback.push({ category: 'Content', message: 'No experience listed. This significantly hurts your score.', type: 'error', scoreImpact: 0 });
     }
 
-    // --- 2. ATS & Structure (20 pts) ---
-    // Sections, Contact Info, Length
+    // Summary presence and quality
+    if (resume.profile.summary && resume.profile.summary.trim().length > 50) {
+        contentScore += 5;
+        feedback.push({ category: 'Content', message: 'Professional summary is present and detailed.', type: 'success', scoreImpact: 5 });
+    } else {
+        feedback.push({ category: 'Content', message: 'Missing or too short professional summary. Add one to boost your score.', type: 'error', scoreImpact: 0 });
+    }
 
+    // --- 2. ATS & Structure (20 pts) ---
     // Core sections check
     const hasExp = resume.experience.length > 0;
     const hasEdu = resume.education.length > 0;
     const hasSkills = resume.skills.length > 0;
-    const hasSummary = !!resume.profile.summary;
 
     if (hasExp && hasEdu && hasSkills) {
         structureScore += 10;
@@ -78,23 +103,20 @@ export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalys
 
     // Length Check
     const totalContent = JSON.stringify(resume).length;
-    // Rough estimation: 3000 chars ~ 400-500 words
     if (totalContent > 1500 && totalContent < 6000) {
         structureScore += 10;
         feedback.push({ category: 'Structure', message: 'Optimal resume length for ATS parsing.', type: 'success', scoreImpact: 10 });
     } else {
-        feedback.push({ category: 'Structure', message: 'Resume might be too short or too long. Aim for 1-2 pages of dense content.', type: 'warning', scoreImpact: 0 });
+        feedback.push({ category: 'Structure', message: 'Resume might be too short or too long. Aim for dense content.', type: 'warning', scoreImpact: 0 });
     }
 
     // --- 3. Job Optimization (20 pts) ---
-    // Keywords matching JD
-
     let matched: string[] = [];
     let missing: string[] = [];
 
     if (jobDescription && jobDescription.trim().length > 50) {
         const jdKeywords = extractKeywords(jobDescription);
-        const targetKeywords = jdKeywords.slice(0, 15); // Top 15 keywords
+        const targetKeywords = jdKeywords.slice(0, 15);
 
         if (targetKeywords.length > 0) {
             const resumeText = JSON.stringify(resume).toLowerCase();
@@ -115,35 +137,41 @@ export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalys
                 feedback.push({ category: 'Keywords', message: 'Low keyword match. Tailor your resume more closely to the JD.', type: 'error', scoreImpact: pts });
             }
         } else {
-            // Fallback if extraction fails
-            keywordScore += 20;
-            feedback.push({ category: 'Keywords', message: 'Could not extract specific keywords, assuming general fit.', type: 'warning', scoreImpact: 20 });
+            keywordScore += 10;
+            feedback.push({ category: 'Keywords', message: 'Could not extract specific keywords, assuming general fit.', type: 'warning', scoreImpact: 10 });
         }
     } else {
-        // No JD provided logic
-        keywordScore += 20;
-        feedback.push({ category: 'Keywords', message: 'No job description provided. Score is based on general best practices.', type: 'success', scoreImpact: 20 });
+        keywordScore += 10; // Penalty for no JD
+        feedback.push({ category: 'Keywords', message: 'No job description provided. Add a JD to unlock accurate keyword scoring.', type: 'warning', scoreImpact: 10 });
     }
 
     // --- 4. Writing Quality (15 pts) ---
-    // Active voice, cliches, capitalization
-
-    // Simple check for passive voice indicators or weak words
     const weakWords = ['responsible for', 'helped', 'assisted', 'worked on'];
+    const buzzwords = ['synergy', 'passionate', 'team player', 'go-getter', 'thought leader'];
     const resumeStrLower = JSON.stringify(resume).toLowerCase();
+    
+    let writingPenalty = 0;
+    
     const hasWeakWords = weakWords.some(w => resumeStrLower.includes(w));
+    if (hasWeakWords) {
+        writingPenalty += 5;
+        feedback.push({ category: 'Writing', message: 'Avoid passive phrases like "Responsible for". Use action verbs.', type: 'warning', scoreImpact: -5 });
+    }
+    
+    const hasBuzzwords = buzzwords.some(w => resumeStrLower.includes(w));
+    if (hasBuzzwords) {
+        writingPenalty += 5;
+        feedback.push({ category: 'Writing', message: 'Avoid cliches and buzzwords (e.g., "team player", "synergy"). Show, don\'t tell.', type: 'warning', scoreImpact: -5 });
+    }
 
-    if (!hasWeakWords) {
-        writingScore += 15;
-        feedback.push({ category: 'Writing', message: 'Strong, active language used throughout.', type: 'success', scoreImpact: 15 });
-    } else {
-        writingScore += 5;
-        feedback.push({ category: 'Writing', message: 'Avoid passive phrases like "Responsible for". Use action verbs like "Managed", "Built", "Led".', type: 'warning', scoreImpact: 5 });
+    writingScore = Math.max(0, 15 - writingPenalty);
+    if (writingPenalty === 0) {
+        feedback.push({ category: 'Writing', message: 'Strong, active language with no buzzwords detected.', type: 'success', scoreImpact: 15 });
+    } else if (writingPenalty < 10) {
+        feedback.push({ category: 'Writing', message: 'Writing is okay, but can be more active and direct.', type: 'success', scoreImpact: writingScore });
     }
 
     // --- 5. Application Ready (15 pts) ---
-    // Contact info, links, final polish
-
     const { email, phone, location, linkedin } = resume.profile;
     if (email && phone && location) {
         applicationScore += 10;
@@ -169,7 +197,7 @@ export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalys
     const overallScore = contentScore + structureScore + keywordScore + writingScore + applicationScore;
 
     return {
-        overallScore: Math.min(100, overallScore), // Cap at 100 just in case
+        overallScore: Math.min(100, Math.max(0, overallScore)),
         categoryScores,
         feedback,
         matchedKeywords: matched,

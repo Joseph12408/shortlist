@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useResumeStore } from "@/lib/store/useResumeStore";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 
 interface AILandingProps {
     onComplete: () => void;
@@ -16,7 +17,8 @@ interface AILandingProps {
 export function AILanding({ onComplete }: AILandingProps) {
     const [isParsing, setIsParsing] = useState(false);
     const [scratchMode, setScratchMode] = useState(false);
-    const { setResume, updateProfile } = useResumeStore();
+    const { setResume, updateProfile, resetBuilderSession } = useResumeStore();
+    const { isPro } = useFeatureAccess();
 
     // --- File Upload Logic ---
     // --- File Upload Logic ---
@@ -68,9 +70,10 @@ export function AILanding({ onComplete }: AILandingProps) {
             const data = await res.json();
 
             if (data.success && data.resume) {
+                resetBuilderSession();
                 setResume({
                     ...data.resume,
-                    id: data.resume.id || "draft" // Ensure ID exists
+                    id: data.resume.id || "draft"
                 });
                 onComplete();
             } else {
@@ -99,19 +102,7 @@ export function AILanding({ onComplete }: AILandingProps) {
     const [jobTitle, setJobTitle] = useState("");
 
     const handleScratchStart = async () => {
-        if (!fullName || !jobTitle) return;
-
-        setIsParsing(true);
-        // Simulate "AI Generating"
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        updateProfile({
-            fullName,
-            summary: `Aspiring ${jobTitle} with a passion for excellence and a track record of...`, // Mock AI Start
-            location: "City, Country",
-        });
-
-        setIsParsing(false);
+        resetBuilderSession();
         onComplete();
     };
 
@@ -122,11 +113,7 @@ export function AILanding({ onComplete }: AILandingProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-10"
             >
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-                    <Sparkles className="w-4 h-4" />
-                    <span>AI-Powered Resume Builder</span>
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold font-heading mb-4 text-foreground">
+                <h1 className="text-4xl md:text-5xl font-bold font-heading mb-4 text-foreground mt-4">
                     Let's build your <span className="text-primary">winning resume</span>.
                 </h1>
                 <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -134,14 +121,14 @@ export function AILanding({ onComplete }: AILandingProps) {
                 </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 gap-8 w-full">
+            <div className={`grid gap-8 w-full md:grid-cols-2`}>
                 {/* Option 1: Upload */}
-                <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="h-full"
-                >
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="h-full"
+                    >
                     <Card
                         {...getRootProps()}
                         className={`
@@ -167,6 +154,7 @@ export function AILanding({ onComplete }: AILandingProps) {
                     </Card>
                 </motion.div>
 
+
                 {/* Option 2: Start Fresh */}
                 <motion.div
                     initial={{ opacity: 0, x: 20 }}
@@ -185,7 +173,7 @@ export function AILanding({ onComplete }: AILandingProps) {
                         <Button
                             size="lg"
                             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8"
-                            onClick={onComplete}
+                            onClick={handleScratchStart}
                         >
                             Create New Resume
                             <ArrowRight className="ml-2 w-4 h-4" />

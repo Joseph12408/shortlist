@@ -25,7 +25,8 @@ export default function ResumesPage() {
 
     const handleCreate = () => {
         createNewResume();
-        router.push("/builder?mode=edit");
+        // Navigate without mode=edit so user sees the AILanding pre-builder page
+        router.push("/builder");
     };
 
     return (

@@ -6,11 +6,13 @@ import Link from "next/link";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 
 
 export default function AnalysisPage() {
-    const { resume, savedResumes, atsScore, atsFeedback, runATSAnalysis, missingKeywords, setResume, setJobDescription, incrementReviewCount } = useResumeStore();
+    const { resume, savedResumes, atsScore, atsFeedback, categoryScores, runATSAnalysis, missingKeywords, setResume, setJobDescription, incrementReviewCount } = useResumeStore();
     const router = useRouter();
+    const { isPro } = useFeatureAccess();
 
     const [isUploading, setIsUploading] = useState(false);
     const [isAnalyzed, setIsAnalyzed] = useState(false);
@@ -138,11 +140,13 @@ export default function AnalysisPage() {
     };
 
     const handleOptimize = () => {
-        if (resume && resume.id) {
-            router.push(`/builder?mode=edit&resumeId=${resume.id}`);
-        } else {
-            router.push("/builder?mode=edit");
-        }
+        // Ensure viewMode is set to resume before navigating so the builder
+        // opens the resume editor (not the cover letter from a previous session).
+        useResumeStore.getState().setViewMode('resume');
+        // We do NOT pass resumeId because the freshly parsed resume is already
+        // in the store's `resume` field; passing an id would cause the builder
+        // to search savedResumes (which may not contain it yet).
+        router.push("/builder?mode=edit&tab=resume");
     };
 
     const handleReset = () => {
@@ -221,18 +225,11 @@ export default function AnalysisPage() {
                             <div className="w-full max-w-xl mt-8">
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Or analyze a saved resume</h3>
                                 <div className="grid gap-3">
-                                    {savedResumes.map((r, idx) => (
+                                    {savedResumes.map((r: any, idx: number) => (
                                         <div
                                             key={`${r.id}-${idx}`}
                                             onClick={() => {
-                                                // Check Feature Access
-                                                if (!useResumeStore.getState().checkFeatureAccess('analyze_edit')) {
-                                                    // For now, we can redirect to upgrade or show an alert.
-                                                    // Since we don't have a modal on this page easily accessible without refactoring,
-                                                    // let's redirect to upgrade page.
-                                                    window.location.href = '/upgrade';
-                                                    return;
-                                                }
+                                                // Check Feature Access removed for Free Users to access AI Review
 
                                                 setResume(r);
                                                 setIsAnalyzed(true);
@@ -301,7 +298,7 @@ export default function AnalysisPage() {
                             <div className="md:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border p-8">
                                 <h3 className="text-xl font-bold mb-6">Score Breakdown</h3>
                                 <div className="space-y-6">
-                                    {useResumeStore.getState().categoryScores && Object.values(useResumeStore.getState().categoryScores).map((cat) => (
+                                    {categoryScores && Object.values(categoryScores).map((cat: any) => (
                                         <div key={cat.name}>
                                             <div className="flex justify-between mb-2">
                                                 <span className="font-medium">{cat.name}</span>
@@ -350,7 +347,7 @@ export default function AnalysisPage() {
                                         <h4 className="font-bold text-red-900 dark:text-red-400 mb-1">Missing Keywords</h4>
                                         <p className="text-sm text-muted-foreground mb-3">Your resume is missing some key terms commonly found in job descriptions.</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {missingKeywords.map((k, idx) => (
+                                            {missingKeywords.map((k: string, idx: number) => (
                                                 <span key={`${k}-${idx}`} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded-md border border-red-100 dark:border-red-900/30">
                                                     {k}
                                                 </span>
@@ -361,12 +358,12 @@ export default function AnalysisPage() {
                             )}
 
                             {/* Render feedback grouped by category if available */}
-                            {useResumeStore.getState().categoryScores ? (
-                                Object.values(useResumeStore.getState().categoryScores).map((cat) => (
+                            {categoryScores ? (
+                                Object.values(categoryScores).map((cat: any) => (
                                     (cat.feedback?.length || 0) > 0 && (
                                         <div key={cat.name} className="space-y-4">
                                             <h4 className="text-lg font-semibold border-b pb-2">{cat.name}</h4>
-                                            {cat.feedback.map((item, i) => (
+                                            {cat.feedback.map((item: any, i: number) => (
                                                 <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border p-6 flex gap-4">
                                                     <div className={`p-2 rounded-lg h-fit text-white shrink-0 ${item.type === 'error' ? 'bg-red-500' : item.type === 'warning' ? 'bg-yellow-500' : 'bg-green-500'}`}>
                                                         {item.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
@@ -381,7 +378,7 @@ export default function AnalysisPage() {
                                 ))
                             ) : (
                                 // Fallback for old feedback structure
-                                atsFeedback?.map((item, i) => (
+                                atsFeedback?.map((item: any, i: number) => (
                                     <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border p-6 flex gap-4">
                                         <div className={`p-2 rounded-lg h-fit text-white ${item.type === 'error' ? 'bg-red-500' : item.type === 'warning' ? 'bg-yellow-500' : 'bg-green-500'}`}>
                                             {item.type === 'success' ? <CheckCircle2 className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}

@@ -3,18 +3,16 @@
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Star, Zap, LayoutTemplate, MessageSquare, ShieldCheck, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useResumeStore } from "@/lib/store/useResumeStore";
-import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 
 export default function UpgradePage() {
-    const { setSubscriptionStatus } = useResumeStore();
-    const router = useRouter();
+    const { user } = useUser();
 
     const handleUpgrade = () => {
-        // Mock upgrade for now
-        setSubscriptionStatus('pro');
-        alert("Welcome to Pro! You now have unlimited access.");
-        router.push('/dashboard');
+        const email = user?.primaryEmailAddress?.emailAddress || "";
+        const productId = "7bd5c63f-c3c6-40f2-931a-93613caf62d4";
+        const checkoutUrl = `/api/checkout?products=${productId}${email ? `&customerEmail=${encodeURIComponent(email)}` : ""}`;
+        window.location.href = checkoutUrl;
     };
 
     return (
@@ -114,7 +112,7 @@ export default function UpgradePage() {
                             Upgrade Now <ArrowRight className="w-5 h-5" />
                         </Button>
                         <p className="text-xs text-center text-muted-foreground mt-4">
-                            Secure payment via Stripe. Cancel anytime.
+                            Secure payment via Polar. Cancel anytime.
                         </p>
                     </div>
                 </div>

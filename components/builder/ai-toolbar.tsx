@@ -1,9 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Sparkles, Download, Eye, EyeOff, LayoutTemplate, FileDown, Palette } from "lucide-react";
+import { Sparkles, Download, Eye, EyeOff, LayoutTemplate, FileDown, Palette, Crown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useResumeStore } from "@/lib/store/useResumeStore";
+import { useRouter } from "next/navigation";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 
 import { THEME_PRESETS } from "@/lib/themes";
 
@@ -17,9 +19,9 @@ interface AIToolbarProps {
 }
 
 export function AIToolbar({ showPreview, onTogglePreview, onExportPdf, onExportDocx, onOptimize, isOptimizing }: AIToolbarProps) {
-    const { atsScore, activeTheme, setTheme, viewMode, generateCoverLetterWithAI, improveResumeWithAI } = useResumeStore(); // Added improveResumeWithAI
-    const router = useRouter(); // Initialized useRouter
-    const { checkFeatureAccess } = useFeatureAccess(); // Initialized useFeatureAccess
+    const { atsScore, activeTheme, setTheme, viewMode, generateCoverLetterWithAI, improveResumeWithAI } = useResumeStore();
+    const router = useRouter(); 
+    const { checkFeatureAccess, isPro } = useFeatureAccess(); 
 
     // Determine score color
     const getScoreColor = (score: number) => {
@@ -104,24 +106,37 @@ export function AIToolbar({ showPreview, onTogglePreview, onExportPdf, onExportD
                     {showPreview ? "Hide Preview" : "Show Preview"}
                 </Button>
 
-                <Button
-                    size="sm"
-                    onClick={handleAction}
-                    disabled={isOptimizing}
-                    className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
-                >
-                    <Sparkles className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} />
-                    {buttonLabel}
-                </Button>
+                {isPro ? (
+                    <Button
+                        size="sm"
+                        onClick={handleAIAction}
+                        disabled={isOptimizing}
+                        className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
+                    >
+                        <Sparkles className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} />
+                        {buttonLabel}
+                    </Button>
+                ) : (
+                    <Button
+                        size="sm"
+                        onClick={onOptimize}
+                        className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
+                    >
+                        <Crown className="w-4 h-4" />
+                        Generate
+                    </Button>
+                )}
 
                 <div className="h-4 w-[1px] bg-border mx-2 hidden md:block" />
 
-                <Button variant="outline" size="sm" onClick={onExportDocx} className="gap-2">
+                <Button variant="outline" size="sm" onClick={() => { if (!isPro) { router.push('/upgrade'); return; } onExportDocx(); }} className="gap-2">
+                    {!isPro && <Crown className="w-3 h-3 text-amber-500" />}
                     <FileDown className="w-4 h-4" />
                     DOCX
                 </Button>
 
-                <Button size="sm" onClick={onExportPdf} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button size="sm" onClick={() => { if (!isPro) { router.push('/upgrade'); return; } onExportPdf(); }} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                    {!isPro && <Crown className="w-3 h-3 text-amber-300" />}
                     <Download className="w-4 h-4" />
                     Export PDF
                 </Button>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { generateContentWithFallback } from '@/lib/gemini';
 import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
 
@@ -7,10 +8,10 @@ export async function POST(request: NextRequest) {
         const { userId } = await auth();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const decision = await arcjet_client.protect(request, { userId });
-        if (decision.isDenied()) {
-            return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
-        }
+        // const decision = await arcjet_client.protect(request, { userId });
+        // if (decision.isDenied()) {
+        //     return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
+        // }
 
         const { text } = await request.json();
 
@@ -81,27 +82,10 @@ RESUME TEXT:
 ${text}
 `;
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.1, // Low temperature for extraction accuracy
-                        maxOutputTokens: 8192,
-                    }
-                })
-            }
-        );
-
-        const data = await response.json();
-
-        if (data.error) {
-            console.error('Gemini API Error:', data.error);
-            return NextResponse.json({ error: data.error.message }, { status: 500 });
-        }
+        const data = await generateContentWithFallback(prompt, apiKey, {
+            temperature: 0.1, // Low temperature for extraction accuracy
+            maxOutputTokens: 8192,
+        });
 
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
@@ -111,7 +95,14 @@ ${text}
 
         // Clean up response
         content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const parsedResume = JSON.parse(content);
+        let parsedResume = JSON.parse(content);
+
+        // Sometimes AI wraps the output in the interface name
+        if (parsedResume.Resume) {
+            parsedResume = parsedResume.Resume;
+        } else if (parsedResume.resume) {
+            parsedResume = parsedResume.resume;
+        }
 
         return NextResponse.json({
             success: true,

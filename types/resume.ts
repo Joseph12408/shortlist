@@ -58,7 +58,7 @@ export interface Resume {
         accentColor: string; // Hex code
         fontBody: string; // 'sans', 'serif', 'mono'
         fontHeading: string; // 'sans', 'serif', 'mono'
-        theme: 'modern' | 'classic' | 'minimal' | 'efficient' | 'sidebar' | 'sidebar_right';
+        theme: 'modern' | 'classic' | 'minimal' | 'efficient' | 'sidebar' | 'sidebar_right' | 'banner' | 'standard';
         // New Design Engine Tokens
         primaryColor?: string; // Neutral dark
         fontPair?: string; // Specific font pair identifier if needed, or just use fontBody/Heading

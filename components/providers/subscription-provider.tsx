@@ -9,10 +9,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const { initialize } = useSubscriptionStore();
 
     useEffect(() => {
-        if (user?.id) {
-            initialize(user.id);
+        if (user) {
+            initialize(user);
         }
-    }, [user?.id, initialize]);
+    }, [user, initialize]);
 
     return <>{children}</>;
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { generateContentWithFallback } from '@/lib/gemini';
 import fs from 'fs';
 import path from 'path';
 import { auth } from '@clerk/nextjs/server';
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
 
-        const { resume, stylePrompt } = await request.json();
+        const { resume, stylePrompt, jobDescription } = await request.json();
 
         if (!resume) {
             return NextResponse.json({ error: 'Resume data required' }, { status: 400 });
@@ -40,6 +41,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Failed to load AI configuration' }, { status: 500 });
         }
 
+        let jobContext = '';
+        if (jobDescription && jobDescription.trim().length > 50) {
+            jobContext = `\nTARGET JOB DESCRIPTION:\n${jobDescription}\n`;
+        }
+
         // Construct the final prompt by combining system instructions with user context
         const prompt = `${systemInstructions}
 
@@ -48,7 +54,7 @@ CONTEXT & INPUT
 ====================
 
 USER STYLE GOAL: "${stylePrompt || 'General Professional'}"
-
+${jobContext}
 INPUT RESUME DATA:
 ${JSON.stringify(resume, null, 2)}
 
@@ -59,28 +65,10 @@ The "INPUT RESUME DATA" is the **single source of truth**.
 - **NEVER use "University of Applied Sciences".**
 - Return ONLY valid JSON adhering to the schema defined above.`;
 
-        // Use direct REST API with gemini-2.5-pro model
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 8192,
-                    }
-                })
-            }
-        );
-
-        const data = await response.json();
-
-        if (data.error) {
-            console.error('Gemini API Error:', data.error);
-            return NextResponse.json({ error: data.error.message }, { status: 500 });
-        }
+        const data = await generateContentWithFallback(prompt, apiKey, {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+        });
 
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 

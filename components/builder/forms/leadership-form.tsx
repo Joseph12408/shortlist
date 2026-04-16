@@ -9,9 +9,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 export function LeadershipForm() {
     const { resume, addLeadership, removeLeadership, updateLeadership } = useResumeStore();
-    const { leadership } = resume;
-
-    if (!leadership) return null;
+    const leadership = resume.leadership || [];
 
     return (
         <div className="space-y-6">

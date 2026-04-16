@@ -11,7 +11,8 @@ import { TemplateBanner } from "./templates/template-banner";
 import { CoverLetterPreview } from "./cover-letter/cover-letter-preview";
 
 export function ResumePreview() {
-    const { resume, selectedTemplate, viewMode } = useResumeStore();
+    const { resume, viewMode } = useResumeStore();
+    const currentTheme = resume.customStyles?.theme || 'modern';
 
     // If in Cover Letter mode, strict return of Cover Letter Preview
     if (viewMode === 'cover-letter') {
@@ -28,14 +29,14 @@ export function ResumePreview() {
             id="resume-preview">
 
             <>
-                {selectedTemplate === 'classic' && <TemplateClassic resume={resume} />}
-                {selectedTemplate === 'modern' && <TemplateModern resume={resume} />}
-                {selectedTemplate === 'minimal' && <TemplateMinimal resume={resume} />}
-                {selectedTemplate === 'efficient' && <TemplateEfficient resume={resume} />}
-                {selectedTemplate === 'standard' && <TemplateStandard resume={resume} />}
-                {selectedTemplate === 'sidebar' && <TemplateSidebar resume={resume} sidebarOnRight={false} />}
-                {selectedTemplate === 'sidebar_right' && <TemplateSidebar resume={resume} sidebarOnRight={true} />}
-                {selectedTemplate === 'banner' && <TemplateBanner resume={resume} />}
+                {currentTheme === 'classic' && <TemplateClassic resume={resume} />}
+                {currentTheme === 'modern' && <TemplateModern resume={resume} />}
+                {currentTheme === 'minimal' && <TemplateMinimal resume={resume} />}
+                {currentTheme === 'efficient' && <TemplateEfficient resume={resume} />}
+                {currentTheme === 'standard' && <TemplateStandard resume={resume} />}
+                {currentTheme === 'sidebar' && <TemplateSidebar resume={resume} sidebarOnRight={false} />}
+                {currentTheme === 'sidebar_right' && <TemplateSidebar resume={resume} sidebarOnRight={true} />}
+                {currentTheme === 'banner' && <TemplateBanner resume={resume} />}
             </>
 
         </div>
