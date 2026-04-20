@@ -62,8 +62,6 @@ export async function generateCoverLetterPDF(coverLetter: CoverLetterData, resum
     let browser = null;
 
     try {
-        const puppeteer = (await import('puppeteer')).default;
-
         // Styles - Reusing base styles but specialized for letter
         const cssPath = path.join(process.cwd(), 'lib', 'resume-renderer', 'styles', 'base.css');
         const cssContent = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
@@ -205,10 +203,33 @@ export async function generateCoverLetterPDF(coverLetter: CoverLetterData, resum
         `;
 
         log("Launching browser...");
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
+        const isLocal = process.env.NODE_ENV === 'development';
+        let pptrArgs: any = {};
+
+        if (isLocal) {
+            const puppeteer = (await import('puppeteer')) as any;
+            const pptr = puppeteer.default || puppeteer;
+            pptrArgs = {
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            };
+            browser = await pptr.launch(pptrArgs);
+        } else {
+            const puppeteerCore = (await import('puppeteer-core')) as any;
+            const pptr = puppeteerCore.default || puppeteerCore;
+            
+            const chromium = (await import('@sparticuz/chromium')) as any;
+            const sparticuz = chromium.default || chromium;
+            
+            pptrArgs = {
+                args: sparticuz.args,
+                defaultViewport: sparticuz.defaultViewport,
+                executablePath: await sparticuz.executablePath(),
+                headless: sparticuz.headless === true ? true : sparticuz.headless,
+                ignoreHTTPSErrors: true,
+            };
+            browser = await pptr.launch(pptrArgs);
+        }
 
         const page = await browser.newPage();
         // Use 'load' instead of 'networkidle0' to be more robust against slow external resources (fonts)

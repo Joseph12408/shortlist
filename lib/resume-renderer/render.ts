@@ -4,8 +4,37 @@ export async function generatePDF(resumeData: Resume): Promise<Buffer> {
     let browser = null;
 
     try {
-        let puppeteer = (await import('puppeteer')) as any;
-        if (puppeteer.default) puppeteer = puppeteer.default;
+        const isLocal = process.env.NODE_ENV === 'development';
+        let puppeteer;
+        let pptrArgs: any = {};
+
+        if (isLocal) {
+            puppeteer = (await import('puppeteer')) as any;
+            if (puppeteer.default) puppeteer = puppeteer.default;
+            pptrArgs = {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--font-render-hinting=none',
+                ],
+            };
+        } else {
+            puppeteer = (await import('puppeteer-core')) as any;
+            if (puppeteer.default) puppeteer = puppeteer.default;
+            
+            const chromium = (await import('@sparticuz/chromium')) as any;
+            const sparticuz = chromium.default || chromium;
+            
+            pptrArgs = {
+                args: sparticuz.args,
+                defaultViewport: sparticuz.defaultViewport,
+                executablePath: await sparticuz.executablePath(),
+                headless: sparticuz.headless === true ? true : sparticuz.headless,
+                ignoreHTTPSErrors: true,
+            };
+        }
 
         const html = buildResumeHTML(resumeData);
         if (!html) {
@@ -15,13 +44,7 @@ export async function generatePDF(resumeData: Resume): Promise<Buffer> {
         console.log("📄 Generated HTML length:", html.length);
 
         browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--font-render-hinting=none',
-            ],
+            ...pptrArgs,
             timeout: 30000,
         });
 
