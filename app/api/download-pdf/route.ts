@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePDF } from '@/lib/resume-renderer/render';
-import { auth } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
         const body = await request.json();
         const resumeData = body.resume || body;
 
