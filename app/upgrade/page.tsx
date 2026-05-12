@@ -22,7 +22,7 @@ export default function UpgradePage() {
             <div className="bg-white dark:bg-slate-900 border-b p-6 sticky top-0 z-50">
                 <div className="container mx-auto flex items-center justify-between">
                     <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl">
-                        Shortlist<span className="text-primary">.ai</span>
+                        Shortlist
                     </Link>
                     <Link href="/dashboard">
                         <Button variant="ghost">Cancel</Button>
@@ -32,10 +32,7 @@ export default function UpgradePage() {
 
             <main className="container mx-auto px-6 py-16 max-w-5xl">
                 <div className="text-center mb-16 space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm">
-                        <Star className="w-4 h-4 fill-primary" />
-                        Upgrade to Pro
-                    </div>
+
                     <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
                         Unlock Your Full Career Potential
                     </h1>
@@ -84,7 +81,7 @@ export default function UpgradePage() {
                             <Zap className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                         </h3>
                         <p className="text-muted-foreground mb-6">Everything you need to get hired</p>
-                        <div className="text-4xl font-bold mb-8">$9.99 <span className="text-lg font-normal text-muted-foreground">/mo</span></div>
+                        <div className="text-4xl font-bold mb-8">$15 <span className="text-lg font-normal text-muted-foreground">/mo</span></div>
 
                         <ul className="space-y-4 mb-8">
                             <li className="flex items-start gap-3">
@@ -122,7 +119,7 @@ export default function UpgradePage() {
                     <DialogContent className="sm:max-w-2xl bg-black text-white p-0 border-slate-800 h-[80vh] overflow-hidden flex flex-col">
                         <div className="flex-1 w-full h-full min-h-[500px]">
                             <WhopCheckoutEmbed 
-                                planId="prod_gCmvpFAxpA8p0" 
+                                planId="plan_y608PYXGfix1q" 
                                 theme="dark"
                                 onComplete={() => {
                                     window.location.href = "/checkout/success";

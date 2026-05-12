@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { WhopCheckoutEmbed } from '@whop/checkout/react';
 
-const MONTHLY_PRODUCT_ID = "prod_gCmvpFAxpA8p0"; // Replace with Monthly Plan ID if different
-const YEARLY_PRODUCT_ID = "prod_gCmvpFAxpA8p0"; // Replace with Yearly Plan ID if different
+const MONTHLY_PRODUCT_ID = "plan_y608PYXGfix1q";
+const YEARLY_PRODUCT_ID = "plan_JEAL8xtw6h1Uo";
 
 export function Paywall({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const { isPro } = useSubscriptionStore();
