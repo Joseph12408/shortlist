@@ -168,7 +168,7 @@ export function Pricing() {
                 </div>
             </div>
 
-            {/* Full-Screen Checkout Overlay — two-column layout matching Whop checkout page */}
+            {/* Full-Screen Checkout Overlay — centered layout */}
             {checkoutPlan && (
                 <div className="fixed inset-0 z-[99999] w-screen h-screen overflow-y-auto" style={{ backgroundColor: '#F4F4F5' }}>
                     {/* Top bar with back button */}
@@ -185,94 +185,23 @@ export function Pricing() {
                         </button>
                     </div>
 
-                    {/* Two-column layout: product info left, checkout form right */}
-                    <div className="w-full max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
-                            
-                            {/* LEFT COLUMN — Product Info */}
-                            <div className="flex flex-col gap-6">
-                                {/* Product header */}
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#E0F2FE' }}>
-                                        <img src="/logo.svg" alt="Shortlist" className="w-7 h-7" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold" style={{ color: '#18181B' }}>Shortlist Pro</h2>
-                                        <p className="text-sm" style={{ color: '#71717A' }}>
-                                            {checkoutPlan === "plan_y608PYXGfix1q" ? "Monthly Plan" : "Yearly Plan"}
-                                        </p>
-                                    </div>
+                    {/* Centered Checkout Form */}
+                    <div className="w-full max-w-4xl mx-auto px-4 py-8 md:py-12">
+                        <WhopCheckoutEmbed 
+                            planId={checkoutPlan} 
+                            theme="light"
+                            fallback={
+                                <div className="flex flex-col items-center justify-center py-32 rounded-xl" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E4E4E7' }}>
+                                    <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: '#A1A1AA' }} />
+                                    <p className="font-medium animate-pulse" style={{ color: '#71717A' }}>Loading secure checkout...</p>
                                 </div>
-
-                                {/* Price */}
-                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E4E4E7' }}>
-                                    <div className="flex items-baseline gap-1 mb-1">
-                                        <span className="text-4xl font-bold" style={{ color: '#18181B' }}>
-                                            {checkoutPlan === "plan_y608PYXGfix1q" ? "$15" : "$120"}
-                                        </span>
-                                        <span className="text-lg" style={{ color: '#71717A' }}>
-                                            {checkoutPlan === "plan_y608PYXGfix1q" ? "/month" : "/year"}
-                                        </span>
-                                    </div>
-                                    {checkoutPlan === "plan_JEAL8xtw6h1Uo" && (
-                                        <p className="text-sm font-medium" style={{ color: '#16A34A' }}>
-                                            Save 33% compared to monthly
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* What's included */}
-                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E4E4E7' }}>
-                                    <h3 className="font-semibold mb-4" style={{ color: '#18181B' }}>What&apos;s included</h3>
-                                    <ul className="space-y-3">
-                                        <li className="flex items-center gap-3">
-                                            <Check className="w-5 h-5 flex-shrink-0" style={{ color: '#16A34A' }} />
-                                            <span style={{ color: '#3F3F46' }}>Full ATS Optimization & Suggestions</span>
-                                        </li>
-                                        <li className="flex items-center gap-3">
-                                            <Check className="w-5 h-5 flex-shrink-0" style={{ color: '#16A34A' }} />
-                                            <span style={{ color: '#3F3F46' }}>AI Resume Generation</span>
-                                        </li>
-                                        <li className="flex items-center gap-3">
-                                            <Check className="w-5 h-5 flex-shrink-0" style={{ color: '#16A34A' }} />
-                                            <span style={{ color: '#3F3F46' }}>AI Cover Letter Builder</span>
-                                        </li>
-                                        <li className="flex items-center gap-3">
-                                            <Check className="w-5 h-5 flex-shrink-0" style={{ color: '#16A34A' }} />
-                                            <span style={{ color: '#3F3F46' }}>Unlimited PDF & DOCX Exports</span>
-                                        </li>
-                                        <li className="flex items-center gap-3">
-                                            <Check className="w-5 h-5 flex-shrink-0" style={{ color: '#16A34A' }} />
-                                            <span style={{ color: '#3F3F46' }}>Unlimited Job Description Scans</span>
-                                        </li>
-                                        <li className="flex items-center gap-3">
-                                            <Check className="w-5 h-5 flex-shrink-0" style={{ color: '#16A34A' }} />
-                                            <span style={{ color: '#3F3F46' }}>All Premium Templates</span>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            {/* RIGHT COLUMN — Checkout Form */}
-                            <div className="w-full">
-                                <WhopCheckoutEmbed 
-                                    planId={checkoutPlan} 
-                                    theme="light"
-                                    fallback={
-                                        <div className="flex flex-col items-center justify-center py-32 rounded-xl" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E4E4E7' }}>
-                                            <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: '#A1A1AA' }} />
-                                            <p className="font-medium animate-pulse" style={{ color: '#71717A' }}>Loading secure checkout...</p>
-                                        </div>
-                                    }
-                                    onComplete={(planId, receiptId) => {
-                                        console.log("Checkout complete", planId, receiptId);
-                                        window.location.href = "/checkout/success";
-                                    }}
-                                    prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
-                                />
-                            </div>
-
-                        </div>
+                            }
+                            onComplete={(planId, receiptId) => {
+                                console.log("Checkout complete", planId, receiptId);
+                                window.location.href = "/checkout/success";
+                            }}
+                            prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
+                        />
                     </div>
                 </div>
             )}
