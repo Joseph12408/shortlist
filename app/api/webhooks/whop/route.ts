@@ -1,40 +1,130 @@
 
-import type { Payment } from "@whop/sdk/resources.js";
 import { NextRequest } from "next/server";
-import { Whop } from "@whop/sdk";
+import { createClerkClient } from "@clerk/nextjs/server";
 
-// Initialize Whop SDK
-const whopsdk = new Whop({
-  apiKey: process.env.WHOP_API_KEY,
-  webhookKey: process.env.WHOP_WEBHOOK_SECRET ? btoa(process.env.WHOP_WEBHOOK_SECRET) : "",
+// Initialize Clerk Backend client
+const clerk = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY,
 });
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {
     const requestBodyText = await request.text();
-    const headers = Object.fromEntries(request.headers);
-    const webhookData = whopsdk.webhooks.unwrap(requestBodyText, { headers });
 
-    if (webhookData.type === "payment.succeeded") {
-      await handlePaymentSucceeded(webhookData.data);
-    } else if (webhookData.type === "membership.activated") {
-      await handleMembershipActivated(webhookData.data);
+    // Verify the webhook signature
+    const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("[WHOP WEBHOOK] Missing WHOP_WEBHOOK_SECRET");
+      return new Response("Server misconfigured", { status: 500 });
+    }
+
+    // Parse the webhook payload
+    let payload: any;
+    try {
+      payload = JSON.parse(requestBodyText);
+    } catch {
+      console.error("[WHOP WEBHOOK] Failed to parse JSON body");
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    console.log("[WHOP WEBHOOK] Received event:", payload.type || payload.action);
+
+    // Handle membership events
+    const eventType = payload.type || payload.action;
+    const data = payload.data;
+
+    if (
+      eventType === "membership.activated" ||
+      eventType === "membership.went_valid"
+    ) {
+      await handleMembershipActivated(data);
+    } else if (
+      eventType === "membership.cancelled" ||
+      eventType === "membership.went_invalid" ||
+      eventType === "membership.expired"
+    ) {
+      await handleMembershipDeactivated(data);
+    } else if (eventType === "payment.succeeded") {
+      console.log("[WHOP WEBHOOK] Payment succeeded:", data?.id);
     }
 
     return new Response("OK", { status: 200 });
   } catch (err) {
-    console.error("Webhook processing failed:", err);
-    return new Response("Invalid Webhook", { status: 400 });
+    console.error("[WHOP WEBHOOK] Processing failed:", err);
+    return new Response("Webhook processing error", { status: 500 });
   }
 }
 
-async function handlePaymentSucceeded(payment: Payment) {
-  console.log("[WHOP PAYMENT SUCCEEDED]", payment.id);
-  // Optional: Add to DB or analytics
+async function handleMembershipActivated(membership: any) {
+  const email = membership?.email || membership?.user?.email;
+  console.log("[WHOP WEBHOOK] Membership activated for email:", email);
+
+  if (!email) {
+    console.error("[WHOP WEBHOOK] No email found in membership data. Full data:", JSON.stringify(membership));
+    return;
+  }
+
+  try {
+    // Find the Clerk user by email
+    const users = await clerk.users.getUserList({
+      emailAddress: [email],
+    });
+
+    if (users.data.length === 0) {
+      console.error("[WHOP WEBHOOK] No Clerk user found for email:", email);
+      return;
+    }
+
+    const clerkUser = users.data[0];
+
+    // Set isPro = true in publicMetadata
+    await clerk.users.updateUserMetadata(clerkUser.id, {
+      publicMetadata: {
+        ...clerkUser.publicMetadata,
+        isPro: true,
+        whopMembershipId: membership?.id,
+        proPlanActivatedAt: new Date().toISOString(),
+      },
+    });
+
+    console.log("[WHOP WEBHOOK] ✅ Pro status activated for user:", clerkUser.id, "email:", email);
+  } catch (error) {
+    console.error("[WHOP WEBHOOK] Failed to update Clerk user:", error);
+  }
 }
 
-async function handleMembershipActivated(membership: any) {
-  console.log("[WHOP MEMBERSHIP ACTIVATED]", membership.id);
-  // Need to update the user's Pro status in DB/Clerk based on membership user email or id
-  // For example, if membership has email, we can update Clerk user metadata
+async function handleMembershipDeactivated(membership: any) {
+  const email = membership?.email || membership?.user?.email;
+  console.log("[WHOP WEBHOOK] Membership deactivated for email:", email);
+
+  if (!email) {
+    console.error("[WHOP WEBHOOK] No email found in membership data");
+    return;
+  }
+
+  try {
+    const users = await clerk.users.getUserList({
+      emailAddress: [email],
+    });
+
+    if (users.data.length === 0) {
+      console.error("[WHOP WEBHOOK] No Clerk user found for email:", email);
+      return;
+    }
+
+    const clerkUser = users.data[0];
+
+    // Set isPro = false in publicMetadata
+    await clerk.users.updateUserMetadata(clerkUser.id, {
+      publicMetadata: {
+        ...clerkUser.publicMetadata,
+        isPro: false,
+        proDeactivatedAt: new Date().toISOString(),
+      },
+    });
+
+    console.log("[WHOP WEBHOOK] ❌ Pro status deactivated for user:", clerkUser.id, "email:", email);
+  } catch (error) {
+    console.error("[WHOP WEBHOOK] Failed to update Clerk user:", error);
+  }
 }
