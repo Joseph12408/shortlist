@@ -1,29 +1,9 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
 import { Check, LayoutTemplate, MessageSquare, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { WhopCheckoutEmbed } from '@whop/checkout/react';
-import { useUser } from '@clerk/nextjs';
-import { X } from "lucide-react";
 
 export function Pricing() {
-    const { user } = useUser();
-    const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
-
-    // Prevent scrolling when checkout is open
-    useEffect(() => {
-        if (checkoutPlan) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [checkoutPlan]);
     return (
         <section id="pricing" className="py-24 px-6">
             <div className="container mx-auto max-w-6xl">
@@ -97,8 +77,8 @@ export function Pricing() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" variant="outline" onClick={() => setCheckoutPlan("plan_y608PYXGfix1q")}>
-                                Get Monthly
+                            <Button className="w-full" variant="outline" asChild>
+                                <a href="https://whop.com/checkout/plan_y608PYXGfix1q">Get Monthly</a>
                             </Button>
                         </CardFooter>
                     </Card>
@@ -137,8 +117,8 @@ export function Pricing() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" onClick={() => setCheckoutPlan("plan_JEAL8xtw6h1Uo")}>
-                                Get Yearly
+                            <Button className="w-full" asChild>
+                                <a href="https://whop.com/checkout/plan_JEAL8xtw6h1Uo">Get Yearly</a>
                             </Button>
                         </CardFooter>
                     </Card>
@@ -168,36 +148,6 @@ export function Pricing() {
                     </div>
                 </div>
             </div>
-
-            {/* Direct Full-Screen Checkout Overlay */}
-            {checkoutPlan && (
-                <div className="fixed inset-0 z-[99999] bg-[#09090b] flex flex-col w-screen h-screen m-0 p-0 overflow-hidden">
-                    {/* Header bar */}
-                    <div className="flex-none h-16 border-b border-white/10 flex items-center px-4 md:px-6 bg-[#09090b]">
-                        <Button 
-                            variant="ghost" 
-                            onClick={() => setCheckoutPlan(null)} 
-                            className="text-gray-400 hover:text-white"
-                        >
-                            <X className="w-4 h-4 mr-2" />
-                            Back to Plans
-                        </Button>
-                    </div>
-
-                    {/* Checkout iframe container with explicit dimensions to prevent collapsing */}
-                    <div className="flex-1 w-full h-[calc(100vh-4rem)] relative">
-                        <WhopCheckoutEmbed 
-                            planId={checkoutPlan} 
-                            theme="dark"
-                            onComplete={(planId, receiptId) => {
-                                console.log("Checkout complete", planId, receiptId);
-                                window.location.href = "/checkout/success";
-                            }}
-                            prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
-                        />
-                    </div>
-                </div>
-            )}
         </section>
     );
 }
