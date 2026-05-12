@@ -6,28 +6,25 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Sparkles, UserCircle, Crown, LayoutDashboard, FileText, BarChart3, Settings } from "lucide-react";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { useState } from "react";
-import { Paywall } from "@/components/subscription/Paywall";
 import { useSubscriptionStore } from "@/lib/store/useSubscriptionStore";
 
 function UpgradeButton() {
-    const [showPaywall, setShowPaywall] = useState(false);
     const { isPro } = useSubscriptionStore();
 
     if (isPro) return null;
 
     return (
-        <>
-            <Button
-                onClick={() => setShowPaywall(true)}
-                variant="outline"
-                size="sm"
-                className="hidden md:flex gap-2 border-amber-500/50 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-            >
+        <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2 border-amber-500/50 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+        >
+            <Link href="/pricing">
                 <Crown className="w-4 h-4" />
                 Upgrade
-            </Button>
-            <Paywall open={showPaywall} onOpenChange={setShowPaywall} />
-        </>
+            </Link>
+        </Button>
     );
 }
 
