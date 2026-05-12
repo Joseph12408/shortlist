@@ -168,47 +168,40 @@ export function Pricing() {
                 </div>
             </div>
 
-            {/* Direct Full-Screen Checkout Overlay (Light Theme matching standalone page) */}
+            {/* Full-Screen Checkout Overlay — matches Whop checkout link page exactly */}
             {checkoutPlan && (
-                <div className="fixed inset-0 z-[99999] bg-[#f9fafb] w-full h-full overflow-y-auto">
-                    {/* Header bar */}
-                    <div className="sticky top-0 z-20 p-4 bg-white border-b flex items-center justify-between shadow-sm">
-                        <span className="font-semibold text-lg ml-2">Complete Checkout</span>
-                        <Button 
-                            variant="ghost" 
+                <div className="fixed inset-0 z-[99999] w-screen h-screen overflow-y-auto" style={{ backgroundColor: '#F4F4F5' }}>
+                    {/* Top bar with back button */}
+                    <div className="sticky top-0 z-10 flex items-center h-14 px-4 md:px-8" style={{ backgroundColor: '#F4F4F5' }}>
+                        <button 
                             onClick={() => setCheckoutPlan(null)} 
-                            className="text-gray-500 hover:text-black hover:bg-gray-100"
+                            className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors"
+                            style={{ color: '#71717A', backgroundColor: 'transparent' }}
+                            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E4E4E7'; e.currentTarget.style.color = '#18181B'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#71717A'; }}
                         >
-                            <X className="w-5 h-5 mr-1" />
-                            Close
-                        </Button>
+                            <X className="w-4 h-4" />
+                            Back to Plans
+                        </button>
                     </div>
 
-                    {/* Checkout iframe container - allowing vertical scroll! */}
-                    <div className="w-full max-w-6xl mx-auto py-8 px-0 sm:px-4">
-                        {/* 
-                            We do NOT constrain the height here with h-[100vh] or overflow-hidden.
-                            We let the Whop SDK inject its iframe, and if the iframe is taller than the screen,
-                            the outer container (overflow-y-auto) will scroll gracefully, 
-                            allowing the user to reach the bottom form fields and "Get Access" button.
-                        */}
-                        <div className="w-full bg-white sm:rounded-xl sm:shadow-lg sm:border p-2 sm:p-6 min-h-[800px] relative">
-                            <WhopCheckoutEmbed 
-                                planId={checkoutPlan} 
-                                theme="light"
-                                fallback={
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10 rounded-xl">
-                                        <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-                                        <p className="text-gray-500 font-medium">Loading secure checkout...</p>
-                                    </div>
-                                }
-                                onComplete={(planId, receiptId) => {
-                                    console.log("Checkout complete", planId, receiptId);
-                                    window.location.href = "/checkout/success";
-                                }}
-                                prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
-                            />
-                        </div>
+                    {/* Checkout embed — no height constraints, scrolls naturally */}
+                    <div className="w-full max-w-4xl mx-auto px-4 pb-12">
+                        <WhopCheckoutEmbed 
+                            planId={checkoutPlan} 
+                            theme="light"
+                            fallback={
+                                <div className="flex flex-col items-center justify-center py-32">
+                                    <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: '#A1A1AA' }} />
+                                    <p className="font-medium animate-pulse" style={{ color: '#71717A' }}>Loading secure checkout...</p>
+                                </div>
+                            }
+                            onComplete={(planId, receiptId) => {
+                                console.log("Checkout complete", planId, receiptId);
+                                window.location.href = "/checkout/success";
+                            }}
+                            prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
+                        />
                     </div>
                 </div>
             )}
