@@ -170,36 +170,45 @@ export function Pricing() {
 
             {/* Direct Full-Screen Checkout Overlay (Light Theme matching standalone page) */}
             {checkoutPlan && (
-                <div className="fixed inset-0 z-[99999] bg-white flex flex-col w-screen h-screen m-0 p-0 overflow-hidden">
+                <div className="fixed inset-0 z-[99999] bg-[#f9fafb] w-full h-full overflow-y-auto">
                     {/* Header bar */}
-                    <div className="flex-none h-16 flex items-center px-4 md:px-8">
+                    <div className="sticky top-0 z-20 p-4 bg-white border-b flex items-center justify-between shadow-sm">
+                        <span className="font-semibold text-lg ml-2">Complete Checkout</span>
                         <Button 
                             variant="ghost" 
                             onClick={() => setCheckoutPlan(null)} 
-                            className="text-gray-600 hover:text-black hover:bg-gray-100"
+                            className="text-gray-500 hover:text-black hover:bg-gray-100"
                         >
-                            <X className="w-4 h-4 mr-2" />
-                            Back to Plans
+                            <X className="w-5 h-5 mr-1" />
+                            Close
                         </Button>
                     </div>
 
-                    {/* Checkout iframe container */}
-                    <div className="flex-1 w-full h-[calc(100vh-4rem)] relative">
-                        <WhopCheckoutEmbed 
-                            planId={checkoutPlan} 
-                            theme="light"
-                            fallback={
-                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
-                                    <Loader2 className="w-10 h-10 animate-spin text-gray-400 mb-4" />
-                                    <p className="text-gray-500 font-medium animate-pulse">Loading secure checkout...</p>
-                                </div>
-                            }
-                            onComplete={(planId, receiptId) => {
-                                console.log("Checkout complete", planId, receiptId);
-                                window.location.href = "/checkout/success";
-                            }}
-                            prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
-                        />
+                    {/* Checkout iframe container - allowing vertical scroll! */}
+                    <div className="w-full max-w-6xl mx-auto py-8 px-0 sm:px-4">
+                        {/* 
+                            We do NOT constrain the height here with h-[100vh] or overflow-hidden.
+                            We let the Whop SDK inject its iframe, and if the iframe is taller than the screen,
+                            the outer container (overflow-y-auto) will scroll gracefully, 
+                            allowing the user to reach the bottom form fields and "Get Access" button.
+                        */}
+                        <div className="w-full bg-white sm:rounded-xl sm:shadow-lg sm:border p-2 sm:p-6 min-h-[800px] relative">
+                            <WhopCheckoutEmbed 
+                                planId={checkoutPlan} 
+                                theme="light"
+                                fallback={
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10 rounded-xl">
+                                        <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+                                        <p className="text-gray-500 font-medium">Loading secure checkout...</p>
+                                    </div>
+                                }
+                                onComplete={(planId, receiptId) => {
+                                    console.log("Checkout complete", planId, receiptId);
+                                    window.location.href = "/checkout/success";
+                                }}
+                                prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
