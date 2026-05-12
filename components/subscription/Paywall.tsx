@@ -30,30 +30,36 @@ export function Paywall({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-4xl bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white border-slate-800">
-                <DialogHeader className="text-center">
-                    <DialogTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-                        Upgrade to Shortlist Pro
-                    </DialogTitle>
-                    <DialogDescription className="text-gray-400 text-lg">
-                        Unlock the full potential of your career tools. Choose your plan.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className={isPurchasing ? "max-w-[100vw] max-h-[100vh] w-screen h-screen p-0 m-0 border-0 rounded-none bg-black flex flex-col" : "sm:max-w-4xl bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white border-slate-800"}>
+                {!isPurchasing && (
+                    <DialogHeader className="text-center">
+                        <DialogTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                            Upgrade to Shortlist Pro
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-400 text-lg">
+                            Unlock the full potential of your career tools. Choose your plan.
+                        </DialogDescription>
+                    </DialogHeader>
+                )}
 
                 {isPurchasing ? (
-                    <div className="w-full h-full min-h-[400px] flex flex-col">
-                        <WhopCheckoutEmbed 
-                            planId={isPurchasing} 
-                            theme="dark"
-                            onComplete={(planId, receiptId) => {
-                                console.log("Checkout complete", planId, receiptId);
-                                window.location.href = "/checkout/success";
-                            }}
-                            prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
-                        />
-                        <Button variant="ghost" onClick={() => setIsPurchasing(null)} className="mt-4 self-center text-gray-400 hover:text-white">
-                            Back to Plans
-                        </Button>
+                    <div className="w-full h-full flex flex-col relative bg-[#09090b]">
+                        <div className="absolute top-4 left-4 z-50">
+                            <Button variant="outline" size="sm" onClick={() => setIsPurchasing(null)} className="text-gray-300 border-gray-700 bg-gray-900/50 hover:bg-gray-800 hover:text-white">
+                                ← Back to Plans
+                            </Button>
+                        </div>
+                        <div className="flex-1 w-full h-full mt-16 px-2 pb-4">
+                            <WhopCheckoutEmbed 
+                                planId={isPurchasing} 
+                                theme="dark"
+                                onComplete={(planId, receiptId) => {
+                                    console.log("Checkout complete", planId, receiptId);
+                                    window.location.href = "/checkout/success";
+                                }}
+                                prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
+                            />
+                        </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 max-w-2xl mx-auto w-full">

@@ -1,8 +1,14 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, LayoutTemplate, MessageSquare, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { useState } from "react";
+import { Paywall } from "@/components/subscription/Paywall";
+
 export function Pricing() {
+    const [paywallOpen, setPaywallOpen] = useState(false);
     return (
         <section id="pricing" className="py-24 px-6">
             <div className="container mx-auto max-w-6xl">
@@ -76,8 +82,8 @@ export function Pricing() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" variant="outline" asChild>
-                                <Link href="/upgrade">Get Monthly</Link>
+                            <Button className="w-full" variant="outline" onClick={() => setPaywallOpen(true)}>
+                                Get Monthly
                             </Button>
                         </CardFooter>
                     </Card>
@@ -116,13 +122,39 @@ export function Pricing() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" asChild>
-                                <Link href="/upgrade">Get Yearly</Link>
+                            <Button className="w-full" onClick={() => setPaywallOpen(true)}>
+                                Get Yearly
                             </Button>
                         </CardFooter>
                     </Card>
                 </div>
+                {/* Feature Deep Dive */}
+                <div className="mt-24 grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <div className="text-center p-6">
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <LayoutTemplate className="w-6 h-6" />
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">Premium Templates</h3>
+                        <p className="text-muted-foreground">Stand out with creative, sidebar, and executive designs proven to catch attention.</p>
+                    </div>
+                    <div className="text-center p-6">
+                        <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <MessageSquare className="w-6 h-6" />
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">AI Cover Letters</h3>
+                        <p className="text-muted-foreground">Stop struggling with writing. Generate perfectly tailored cover letters for every job in seconds.</p>
+                    </div>
+                    <div className="text-center p-6">
+                        <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <ShieldCheck className="w-6 h-6" />
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">ATS Guarantee</h3>
+                        <p className="text-muted-foreground">Unlimited scans to ensure your resume hits every keyword and passes the bots.</p>
+                    </div>
+                </div>
             </div>
+
+            <Paywall open={paywallOpen} onOpenChange={setPaywallOpen} />
         </section>
     );
 }
