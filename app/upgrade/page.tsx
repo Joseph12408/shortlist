@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Star, Zap, LayoutTemplate, MessageSquare, ShieldCheck, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
+import { useState } from "react";
+import { WhopCheckoutEmbed } from "@whop/checkout/react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function UpgradePage() {
     const { user } = useUser();
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
     const handleUpgrade = () => {
-        const email = user?.primaryEmailAddress?.emailAddress || "";
-        const productId = "7bd5c63f-c3c6-40f2-931a-93613caf62d4";
-        const checkoutUrl = `/api/checkout?products=${productId}${email ? `&customerEmail=${encodeURIComponent(email)}` : ""}`;
-        window.location.href = checkoutUrl;
+        setIsCheckoutOpen(true);
     };
 
     return (
@@ -112,10 +113,25 @@ export default function UpgradePage() {
                             Upgrade Now <ArrowRight className="w-5 h-5" />
                         </Button>
                         <p className="text-xs text-center text-muted-foreground mt-4">
-                            Secure payment via Polar. Cancel anytime.
+                            Secure payment via Whop. Cancel anytime.
                         </p>
                     </div>
                 </div>
+
+                <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+                    <DialogContent className="sm:max-w-2xl bg-black text-white p-0 border-slate-800 h-[80vh] overflow-hidden flex flex-col">
+                        <div className="flex-1 w-full h-full min-h-[500px]">
+                            <WhopCheckoutEmbed 
+                                planId="prod_gCmvpFAxpA8p0" 
+                                theme="dark"
+                                onComplete={() => {
+                                    window.location.href = "/checkout/success";
+                                }}
+                                prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
+                            />
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Feature Deep Dive */}
                 <div className="mt-24 grid md:grid-cols-3 gap-8">

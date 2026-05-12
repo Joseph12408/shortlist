@@ -12,9 +12,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { WhopCheckoutEmbed } from '@whop/checkout/react';
 
-const MONTHLY_PRODUCT_ID = "7bd5c63f-c3c6-40f2-931a-93613caf62d4";
-const YEARLY_PRODUCT_ID = "4b92f1ab-19d2-476b-b993-0ca44379e4cc";
+const MONTHLY_PRODUCT_ID = "prod_gCmvpFAxpA8p0"; // Replace with Monthly Plan ID if different
+const YEARLY_PRODUCT_ID = "prod_gCmvpFAxpA8p0"; // Replace with Yearly Plan ID if different
 
 export function Paywall({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const { isPro } = useSubscriptionStore();
@@ -23,9 +24,6 @@ export function Paywall({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
     const handlePurchase = (productId: string) => {
         setIsPurchasing(productId);
-        const email = user?.primaryEmailAddress?.emailAddress || "";
-        const checkoutUrl = `/api/checkout?products=${productId}${email ? `&customerEmail=${encodeURIComponent(email)}` : ""}`;
-        window.location.href = checkoutUrl;
     };
 
     if (isPro) return null;
@@ -42,57 +40,74 @@ export function Paywall({ open, onOpenChange }: { open: boolean; onOpenChange: (
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 max-w-2xl mx-auto w-full">
-                    {/* Monthly Plan */}
-                    <div className="relative rounded-2xl border border-slate-700 bg-slate-800/50 p-6 flex flex-col hover:border-blue-500 transition-colors">
-                        <h3 className="text-xl font-semibold mb-2 text-center">Pro Monthly</h3>
-                        <div className="text-3xl font-bold mb-4 text-center">
-                            $15 <span className="text-sm font-normal text-gray-400">/ mo</span>
-                        </div>
-
-                        <ul className="space-y-3 mb-6 flex-grow text-gray-300">
-                            <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> AI Resume Generation</li>
-                            <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Unlimited PDF Downloads</li>
-                            <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Cover Letter Builder</li>
-                        </ul>
-
-                        <Button
-                            onClick={() => handlePurchase(MONTHLY_PRODUCT_ID)}
-                            disabled={isPurchasing !== null}
-                            className="w-full bg-slate-700 hover:bg-slate-600 text-white"
-                        >
-                            {isPurchasing === MONTHLY_PRODUCT_ID ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe Monthly"}
+                {isPurchasing ? (
+                    <div className="w-full h-full min-h-[400px] flex flex-col">
+                        <WhopCheckoutEmbed 
+                            planId={isPurchasing} 
+                            theme="dark"
+                            onComplete={(planId, receiptId) => {
+                                console.log("Checkout complete", planId, receiptId);
+                                window.location.href = "/checkout/success";
+                            }}
+                            prefill={{ email: user?.primaryEmailAddress?.emailAddress }}
+                        />
+                        <Button variant="ghost" onClick={() => setIsPurchasing(null)} className="mt-4 self-center text-gray-400 hover:text-white">
+                            Back to Plans
                         </Button>
                     </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 max-w-2xl mx-auto w-full">
+                        {/* Monthly Plan */}
+                        <div className="relative rounded-2xl border border-slate-700 bg-slate-800/50 p-6 flex flex-col hover:border-blue-500 transition-colors">
+                            <h3 className="text-xl font-semibold mb-2 text-center">Pro Monthly</h3>
+                            <div className="text-3xl font-bold mb-4 text-center">
+                                $15 <span className="text-sm font-normal text-gray-400">/ mo</span>
+                            </div>
 
-                    {/* Yearly Plan */}
-                    <div className="relative rounded-2xl border border-blue-500 bg-blue-900/20 p-6 flex flex-col hover:border-blue-400 transition-colors">
-                        <div className="absolute top-0 right-0 transform translate-x-2 -translate-y-2 bg-gradient-to-r from-blue-500 to-emerald-400 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-                            BEST VALUE
+                            <ul className="space-y-3 mb-6 flex-grow text-gray-300">
+                                <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> AI Resume Generation</li>
+                                <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Unlimited PDF Downloads</li>
+                                <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Cover Letter Builder</li>
+                            </ul>
+
+                            <Button
+                                onClick={() => handlePurchase(MONTHLY_PRODUCT_ID)}
+                                disabled={isPurchasing !== null}
+                                className="w-full bg-slate-700 hover:bg-slate-600 text-white"
+                            >
+                                {isPurchasing === MONTHLY_PRODUCT_ID ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe Monthly"}
+                            </Button>
                         </div>
-                        <h3 className="text-xl font-semibold mb-2 text-center text-blue-100">Pro Yearly</h3>
-                        <div className="text-3xl font-bold mb-4 text-center text-white">
-                            $120 <span className="text-sm font-normal text-blue-200">/ yr</span>
+
+                        {/* Yearly Plan */}
+                        <div className="relative rounded-2xl border border-blue-500 bg-blue-900/20 p-6 flex flex-col hover:border-blue-400 transition-colors">
+                            <div className="absolute top-0 right-0 transform translate-x-2 -translate-y-2 bg-gradient-to-r from-blue-500 to-emerald-400 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                                BEST VALUE
+                            </div>
+                            <h3 className="text-xl font-semibold mb-2 text-center text-blue-100">Pro Yearly</h3>
+                            <div className="text-3xl font-bold mb-4 text-center text-white">
+                                $120 <span className="text-sm font-normal text-blue-200">/ yr</span>
+                            </div>
+
+                            <ul className="space-y-3 mb-6 flex-grow text-gray-300">
+                                <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> AI Resume Generation</li>
+                                <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Unlimited PDF Downloads</li>
+                                <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Cover Letter Builder</li>
+                            </ul>
+
+                            <Button
+                                onClick={() => handlePurchase(YEARLY_PRODUCT_ID)}
+                                disabled={isPurchasing !== null}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25"
+                            >
+                                {isPurchasing === YEARLY_PRODUCT_ID ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe Yearly"}
+                            </Button>
                         </div>
-
-                        <ul className="space-y-3 mb-6 flex-grow text-gray-300">
-                            <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> AI Resume Generation</li>
-                            <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Unlimited PDF Downloads</li>
-                            <li className="flex items-center gap-2"><Check className="w-5 h-5 text-emerald-400" /> Cover Letter Builder</li>
-                        </ul>
-
-                        <Button
-                            onClick={() => handlePurchase(YEARLY_PRODUCT_ID)}
-                            disabled={isPurchasing !== null}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25"
-                        >
-                            {isPurchasing === YEARLY_PRODUCT_ID ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe Yearly"}
-                        </Button>
                     </div>
-                </div>
+                )}
 
                 <div className="text-center text-xs text-gray-500 mt-4">
-                    Secure checkout powered by Polar
+                    Secure checkout powered by Whop
                 </div>
             </DialogContent>
         </Dialog>

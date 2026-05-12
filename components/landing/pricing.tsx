@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-
+import Link from "next/link";
 export function Pricing() {
     return (
         <section id="pricing" className="py-24 px-6">
@@ -44,7 +44,7 @@ export function Pricing() {
                         </CardContent>
                         <CardFooter>
                             <Button className="w-full" variant="outline" asChild>
-                                <a href="/builder">Get Started</a>
+                                <Link href="/builder">Get Started</Link>
                             </Button>
                         </CardFooter>
                     </Card>
@@ -77,7 +77,7 @@ export function Pricing() {
                         </CardContent>
                         <CardFooter>
                             <Button className="w-full" variant="outline" asChild>
-                                <a href="/api/checkout?products=7bd5c63f-c3c6-40f2-931a-93613caf62d4">Get Monthly</a>
+                                <Link href="/upgrade">Get Monthly</Link>
                             </Button>
                         </CardFooter>
                     </Card>
@@ -117,7 +117,7 @@ export function Pricing() {
                         </CardContent>
                         <CardFooter>
                             <Button className="w-full" asChild>
-                                <a href="/api/checkout?products=4b92f1ab-19d2-476b-b993-0ca44379e4cc">Get Yearly</a>
+                                <Link href="/upgrade">Get Yearly</Link>
                             </Button>
                         </CardFooter>
                     </Card>
