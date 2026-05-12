@@ -1,4 +1,4 @@
-import { waitUntil } from "@vercel/functions";
+
 import type { Payment } from "@whop/sdk/resources.js";
 import { NextRequest } from "next/server";
 import { Whop } from "@whop/sdk";
@@ -16,9 +16,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     const webhookData = whopsdk.webhooks.unwrap(requestBodyText, { headers });
 
     if (webhookData.type === "payment.succeeded") {
-      waitUntil(handlePaymentSucceeded(webhookData.data));
+      await handlePaymentSucceeded(webhookData.data);
     } else if (webhookData.type === "membership.activated") {
-      waitUntil(handleMembershipActivated(webhookData.data));
+      await handleMembershipActivated(webhookData.data);
     }
 
     return new Response("OK", { status: 200 });
