@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
 import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
+import { generateCoverLetterSchema, safeParseBody } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,7 +14,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
 
-        const { resume, jobTitle, company, tone } = await request.json();
+        // Safe body parsing (rejects oversized / malformed payloads)
+        const bodyResult = await safeParseBody(request);
+        if ('error' in bodyResult) return bodyResult.error;
+
+        // Zod validation
+        const parsed = generateCoverLetterSchema.safeParse(bodyResult.data);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: parsed.error.flatten().fieldErrors },
+                { status: 400 }
+            );
+        }
+
+        const { resume, jobTitle, company, tone } = parsed.data;
 
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
@@ -33,10 +47,10 @@ export async function POST(request: NextRequest) {
         TASK: Write a compelling, professional cover letter for the following candidate applying for a specific role.
         
         CANDIDATE INFO (FROM RESUME):
-        Name: ${resume.profile?.fullName || 'Candidate'}
-        Email: ${resume.profile?.email || ''}
-        Phone: ${resume.profile?.phone || ''}
-        Address: ${resume.profile?.location || ''}
+        Name: ${(resume as any).profile?.fullName || 'Candidate'}
+        Email: ${(resume as any).profile?.email || ''}
+        Phone: ${(resume as any).profile?.phone || ''}
+        Address: ${(resume as any).profile?.location || ''}
         (If any contact info is missing, DO NOT insert placeholders. Just omit it from the header/signature).
 
         RESUME CONTENT:

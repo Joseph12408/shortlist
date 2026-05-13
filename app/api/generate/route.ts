@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
+import { generateResumeSchema, safeParseBody } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
     try {
@@ -19,11 +20,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
 
-        const { resume, stylePrompt, jobDescription } = await request.json();
+        // 3. Safe body parsing (rejects oversized / malformed payloads)
+        const bodyResult = await safeParseBody(request);
+        if ('error' in bodyResult) return bodyResult.error;
 
-        if (!resume) {
-            return NextResponse.json({ error: 'Resume data required' }, { status: 400 });
+        // 4. Zod validation
+        const parsed = generateResumeSchema.safeParse(bodyResult.data);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: parsed.error.flatten().fieldErrors },
+                { status: 400 }
+            );
         }
+
+        const { resume, stylePrompt, jobDescription } = parsed.data;
 
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {

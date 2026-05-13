@@ -1,9 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePDF } from '@/lib/resume-renderer/render';
+import { auth } from '@clerk/nextjs/server';
+import arcjet_client from '@/lib/arcjet';
+import { safeParseBody } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
+        // 1. Authentication
+        const { userId } = await auth();
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // 2. Rate Limiting
+        const decision = await arcjet_client.protect(request, { userId });
+        if (decision.isDenied()) {
+            return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
+        }
+
+        // 3. Safe body parsing (rejects oversized / malformed payloads)
+        const bodyResult = await safeParseBody(request);
+        if ('error' in bodyResult) return bodyResult.error;
+
+        const body = bodyResult.data as any;
         const resumeData = body.resume || body;
 
         if (!resumeData || !resumeData.profile) {

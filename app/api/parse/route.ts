@@ -2,22 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
 import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
+import { parseResumeSchema, safeParseBody } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
     try {
         const { userId } = await auth();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        // const decision = await arcjet_client.protect(request, { userId });
-        // if (decision.isDenied()) {
-        //     return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
-        // }
-
-        const { text } = await request.json();
-
-        if (!text) {
-            return NextResponse.json({ error: 'Resume text required' }, { status: 400 });
+        const decision = await arcjet_client.protect(request, { userId });
+        if (decision.isDenied()) {
+            return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
+
+        // Safe body parsing (rejects oversized / malformed payloads)
+        const bodyResult = await safeParseBody(request);
+        if ('error' in bodyResult) return bodyResult.error;
+
+        // Zod validation
+        const parsed = parseResumeSchema.safeParse(bodyResult.data);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: parsed.error.flatten().fieldErrors },
+                { status: 400 }
+            );
+        }
+
+        const { text } = parsed.data;
 
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
