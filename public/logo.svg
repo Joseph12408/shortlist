@@ -1,8 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M9 2h6a2 2 0 0 1 2 2v2h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V4a2 2 0 0 1 2-2z" />
-  <circle cx="12" cy="4" r="1" fill="currentColor" stroke="none" />
-  <line x1="9" y1="12" x2="16" y2="12" />
-  <line x1="9" y1="16" x2="16" y2="16" />
-  <path d="M6 12h.01" />
-  <path d="M6 16h.01" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#345ba0">
+  <!-- Outer Border -->
+  <path fill-rule="evenodd" d="M 20 18 H 80 A 10 10 0 0 1 90 28 V 88 A 10 10 0 0 1 80 98 H 20 A 10 10 0 0 1 10 88 V 28 A 10 10 0 0 1 20 18 Z M 20 26 A 2 2 0 0 0 18 28 V 88 A 2 2 0 0 0 20 90 H 80 A 2 2 0 0 0 82 88 V 28 A 2 2 0 0 0 80 26 H 20 Z" />
+
+  <!-- Clip -->
+  <path fill-rule="evenodd" d="M 36 28 V 22 A 2 2 0 0 1 38 20 H 43 A 9 9 0 0 1 50 8 A 9 9 0 0 1 57 20 H 62 A 2 2 0 0 1 64 22 V 28 Z M 50 12 A 4 4 0 1 0 50 20 A 4 4 0 1 0 50 12 Z" />
+
+  <!-- Item 1 -->
+  <circle cx="34" cy="38" r="3.5" />
+  <rect x="42" y="35.5" width="24" height="5" rx="2.5" />
+
+  <!-- Item 2 -->
+  <circle cx="34" cy="49" r="3.5" />
+  <rect x="42" y="46.5" width="24" height="5" rx="2.5" />
+
+  <!-- Item 3 -->
+  <circle cx="34" cy="60" r="3.5" />
+  <rect x="42" y="57.5" width="24" height="5" rx="2.5" />
+
+  <!-- Item 4 -->
+  <circle cx="34" cy="71" r="3.5" />
+  <rect x="42" y="68.5" width="24" height="5" rx="2.5" />
+
+  <!-- Item 5 -->
+  <circle cx="34" cy="82" r="3.5" />
+  <rect x="42" y="79.5" width="24" height="5" rx="2.5" />
 </svg>

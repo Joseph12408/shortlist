@@ -33,7 +33,7 @@ export function Header() {
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-16 items-center justify-between">
                 <Link href="/" className="flex items-center space-x-2">
-                    <img src="/logo.svg" alt="Shortlist Logo" className="h-6 w-6 text-primary" style={{ stroke: 'currentColor' }} />
+                    <img src="/logo.svg" alt="Shortlist Logo" className="h-6 w-6 text-primary" />
                     <span className="font-heading text-xl font-bold tracking-tight text-foreground">
                         Shortlist
                     </span>
@@ -99,7 +99,7 @@ export function Header() {
                     <SheetContent side="right">
                         <div className="flex flex-col gap-6 mt-6">
                             <Link href="/" className="flex items-center space-x-2">
-                                <img src="/logo.svg" alt="Shortlist Logo" className="h-5 w-5 text-primary" style={{ stroke: 'currentColor' }} />
+                                <img src="/logo.svg" alt="Shortlist Logo" className="h-5 w-5 text-primary" />
                                 <span className="font-heading text-lg font-bold">Shortlist</span>
                             </Link>
                             <nav className="flex flex-col gap-4">
