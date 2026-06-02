@@ -32,7 +32,7 @@ export function AIToolbar({ showPreview, onTogglePreview, onExportPdf, onExportD
 
     const handleAIAction = async () => { // Renamed handleAction to handleAIAction for clarity
         if (!checkFeatureAccess('ai_write')) {
-            router.push('/upgrade');
+            router.push('/pricing');
             return;
         }
 
@@ -129,13 +129,13 @@ export function AIToolbar({ showPreview, onTogglePreview, onExportPdf, onExportD
 
                 <div className="h-4 w-[1px] bg-border mx-2 hidden md:block" />
 
-                <Button variant="outline" size="sm" onClick={() => { if (!isPro) { router.push('/upgrade'); return; } onExportDocx(); }} className="gap-2">
+                <Button variant="outline" size="sm" onClick={() => { if (!isPro) { router.push('/pricing'); return; } onExportDocx(); }} className="gap-2">
                     {!isPro && <Crown className="w-3 h-3 text-amber-500" />}
                     <FileDown className="w-4 h-4" />
                     DOCX
                 </Button>
 
-                <Button size="sm" onClick={() => { if (!isPro) { router.push('/upgrade'); return; } onExportPdf(); }} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button size="sm" onClick={() => { if (!isPro) { router.push('/pricing'); return; } onExportPdf(); }} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
                     {!isPro && <Crown className="w-3 h-3 text-amber-300" />}
                     <Download className="w-4 h-4" />
                     Export PDF

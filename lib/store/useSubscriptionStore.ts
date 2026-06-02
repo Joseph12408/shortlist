@@ -13,8 +13,16 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     initialize: async (user: any) => {
         set({ isLoading: true });
         try {
-            // Rely on Clerk's publicMetadata for Pro status
-            const isPro = user?.publicMetadata?.isPro === true;
+            // Rely on Clerk's publicMetadata or check the registered test emails
+            const email = user?.primaryEmailAddress?.emailAddress;
+            const isProForLife = [
+                "josephnjuma793@gmail.com",
+                "nkemvoudaniel@gmail.com",
+                "obi.junior@icloud.com",
+                "rozayozioma@gmail.com",
+                "75dxwm827d@privaterelay.appleid.com"
+            ].includes(email || "");
+            const isPro = isProForLife || user?.publicMetadata?.isPro === true || user?.publicMetadata?.isPro === "true";
             set({ isPro, isLoading: false });
         } catch (error) {
             console.error("Failed to initialize subscription:", error);

@@ -6,10 +6,16 @@ export const PRO_TEMPLATES = ['modern', 'minimal'];
 export function useFeatureAccess() {
     const { user, isLoaded } = useUser();
 
-    // The user's requested email for lifetime pro
-    const isProForLife = user?.primaryEmailAddress?.emailAddress === "josephnjuma793@gmail.com";
-    // Check Clerk metadata for an active Polar subscription
-    const hasPolarPro = user?.publicMetadata?.isPro === true;
+    // The user's requested email for lifetime pro, including all registered test accounts
+    const isProForLife = [
+        "josephnjuma793@gmail.com",
+        "nkemvoudaniel@gmail.com",
+        "obi.junior@icloud.com",
+        "rozayozioma@gmail.com",
+        "75dxwm827d@privaterelay.appleid.com"
+    ].includes(user?.primaryEmailAddress?.emailAddress || "");
+    // Check Clerk metadata for an active Polar subscription (also checking string values)
+    const hasPolarPro = user?.publicMetadata?.isPro === true || user?.publicMetadata?.isPro === "true";
 
     // User is Pro if either condition is met
     const isPro = isProForLife || hasPolarPro;
