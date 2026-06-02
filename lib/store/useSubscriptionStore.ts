@@ -13,15 +13,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     initialize: async (user: any) => {
         set({ isLoading: true });
         try {
-            // Rely on Clerk's publicMetadata or check the registered test emails
+            // Rely on Clerk's publicMetadata or developer bypass
             const email = user?.primaryEmailAddress?.emailAddress;
-            const isProForLife = [
-                "josephnjuma793@gmail.com",
-                "nkemvoudaniel@gmail.com",
-                "obi.junior@icloud.com",
-                "rozayozioma@gmail.com",
-                "75dxwm827d@privaterelay.appleid.com"
-            ].includes(email || "");
+            const isProForLife = email === "josephnjuma793@gmail.com";
             const isPro = isProForLife || user?.publicMetadata?.isPro === true || user?.publicMetadata?.isPro === "true";
             set({ isPro, isLoading: false });
         } catch (error) {
