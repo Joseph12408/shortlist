@@ -4,6 +4,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { User, GraduationCap, Briefcase, Code, FolderGit2, Loader2 } from "lucide-react";
 import { useResumeStore } from "@/lib/store/useResumeStore";
+import { toast } from "@/lib/toast";
 import { ProfileForm } from "./forms/profile-form";
 import { EducationForm } from "./forms/education-form";
 import { ExperienceForm } from "./forms/experience-form";
@@ -241,7 +242,7 @@ function ReferenceResumeDropzone() {
             }
         } catch (err) {
             console.error(err);
-            alert("Failed to parse reference resume.");
+            toast.error("Something went wrong reading that resume. Please try again.");
         } finally {
             setIsParsing(false);
         }

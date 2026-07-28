@@ -13,10 +13,19 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
     initialize: async (user: any) => {
         set({ isLoading: true });
         try {
-            // Rely on Clerk's publicMetadata or developer bypass
             const email = user?.primaryEmailAddress?.emailAddress;
             const isProForLife = email === "josephnjuma793@gmail.com";
-            const isPro = isProForLife || user?.publicMetadata?.isPro === true || user?.publicMetadata?.isPro === "true";
+            let isPro = isProForLife || user?.publicMetadata?.isPro === true || user?.publicMetadata?.isPro === "true";
+            
+            if (!isPro) {
+                const res = await fetch("/api/subscription/check");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.isPro) {
+                        isPro = true;
+                    }
+                }
+            }
             set({ isPro, isLoading: false });
         } catch (error) {
             console.error("Failed to initialize subscription:", error);

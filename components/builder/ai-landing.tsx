@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { toast } from "@/lib/toast";
 
 interface AILandingProps {
     onComplete: () => void;
@@ -41,10 +42,11 @@ export function AILanding({ onComplete }: AILandingProps) {
             }
             return fullText;
         } catch (error: any) {
+            // Full detail stays in the console.
             console.error("PDF Parse Error:", error);
-            if (error.name === 'MissingPDFException') throw new Error("Invalid PDF file.");
-            if (error.message?.includes('worker')) throw new Error("PDF Worker failed to load.");
-            throw new Error(error.message || "Failed to parse PDF");
+            if (error.name === 'MissingPDFException') throw new Error("That file doesn't look like a valid PDF.");
+            if (error.message?.includes('worker')) throw new Error("Couldn't load the PDF reader. Please check your internet connection.");
+            throw new Error("Couldn't read that PDF. Please try a different file.");
         }
     };
 
@@ -77,12 +79,15 @@ export function AILanding({ onComplete }: AILandingProps) {
                 });
                 onComplete();
             } else {
-                alert("Failed to parse resume: " + (data.error || "Unknown error"));
+                // data.error is already a user-safe message from the API route.
+                toast.error(data.error || "Something went wrong reading your resume. Please try again.");
             }
 
         } catch (error: any) {
+            // Full detail stays in the console. `error.message` here comes only
+            // from the safe messages thrown above, never raw library internals.
             console.error(error);
-            alert(`Failed to process file: ${error.message}`);
+            toast.error(error.message || "Something went wrong processing your file. Please try again.");
         } finally {
             setIsParsing(false);
         }

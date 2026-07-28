@@ -68,6 +68,18 @@ export const downloadCoverLetterSchema = z.object({
     }),
 });
 
+// ── /api/job-scan ───────────────────────────────────────────
+export const jobScanSchema = z.object({
+    jobDescription: z
+        .string()
+        .min(50, "Job description is too short to scan")
+        .max(10_000, "Job description exceeds 10,000 character limit"),
+    atsScore: z.number().min(0).max(100),
+    matchedKeywords: z.array(z.string().max(120)).max(100).default([]),
+    missingKeywords: z.array(z.string().max(120)).max(100).default([]),
+    resumeId: z.string().max(100).optional(),
+});
+
 // ── Helpers ─────────────────────────────────────────────────
 
 /** Max allowed request body size in bytes (2 MB) */

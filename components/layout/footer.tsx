@@ -29,8 +29,13 @@ export function Footer() {
                         </ul>
                     </div>
                 </div>
-                <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-                    &copy; {new Date().getFullYear()} Shortlist. All rights reserved.
+                <div className="mt-8 pt-8 border-t space-y-4 text-center text-sm text-muted-foreground">
+                    {/* PRD §13, required disclaimer. */}
+                    <p className="max-w-2xl mx-auto text-xs leading-relaxed">
+                        Shortlist does not guarantee employment. It optimizes resumes using ATS
+                        standards and best practices.
+                    </p>
+                    <p>&copy; {new Date().getFullYear()} Shortlist. All rights reserved.</p>
                 </div>
             </div>
         </footer>

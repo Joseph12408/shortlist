@@ -6,6 +6,7 @@ import { analyzeResume, ATSFeedback } from '@/lib/ats/ats-score';
 import { THEME_PRESETS } from '../themes';
 import { convex } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
+import { toast } from '@/lib/toast';
 
 export interface ResumeState {
     savedResumes: Resume[];
@@ -24,6 +25,8 @@ export interface ResumeState {
     referenceResume?: Resume | null;
     viewMode?: 'resume' | 'cover-letter' | 'design' | string;
     isPreviewVisible?: boolean;
+    /** Free-tier job-scan quota, refreshed from /api/job-scan. */
+    scanUsage: { used: number; limit: number | null; blocked: boolean };
 
     // Actions
     initialize: () => Promise<void>;
@@ -36,9 +39,10 @@ export interface ResumeState {
     deleteResume: (id: string) => Promise<void>;
     
     // Cover Letter actions
-    createNewCoverLetter: () => void;
-    deleteCoverLetter: (id: string) => void;
+    createNewCoverLetter: () => Promise<void>;
+    deleteCoverLetter: (id: string) => Promise<void>;
     updateCoverLetter: (data: any) => void;
+    saveCurrentCoverLetter: () => Promise<void>;
     loadCoverLetter: (id: string) => void;
     generateCoverLetterWithAI: () => Promise<void>;
     
@@ -63,6 +67,11 @@ export interface ResumeState {
     // AI
     setJobDescription: (text: string) => void;
     runATSAnalysis: () => void;
+    /** Commits the current JD as a metered scan against the free-tier quota. */
+    commitJobScan: () => Promise<void>;
+    refreshScanUsage: () => Promise<void>;
+    /** Saves the current analysis to the AI Reviews history. */
+    recordAnalysis: (resumeTitle: string) => Promise<void>;
     improveResumeWithAI: () => Promise<void>;
     
     incrementReviewCount: () => void;
@@ -72,6 +81,16 @@ export interface ResumeState {
     setViewMode: (mode: string) => void;
     setPreviewVisible: (visible: boolean) => void;
     setColors: (primary: string, accent: string) => void;
+}
+
+/**
+ * Local drafts use a UUID (36 chars, dash-separated) or the literal 'draft';
+ * anything else is a real Convex document id. Convex ids never contain dashes,
+ * so this cleanly distinguishes "needs insert" from "needs patch".
+ */
+function isDraftId(id: string | undefined | null): boolean {
+    if (!id) return true;
+    return id === 'draft' || (id.length === 36 && id.includes('-'));
 }
 
 const initialResume: Resume = {
@@ -119,6 +138,7 @@ export const useResumeStore = create<ResumeState>()(
             matchedKeywords: [],
             missingKeywords: [],
             stats: { totalReviews: 0 },
+            scanUsage: { used: 0, limit: null, blocked: false },
             isLoading: true,
             initialLoadDone: false,
 
@@ -126,7 +146,23 @@ export const useResumeStore = create<ResumeState>()(
                 set({ isLoading: true });
 
                 try {
-                    const resumes = await convex.query(api.resumes.list, {});
+                    const [resumes, coverLetters] = await Promise.all([
+                        convex.query(api.resumes.list, {}),
+                        convex.query(api.coverLetters.list, {}).catch(() => null),
+                    ]);
+
+                    // Convex is the source of truth for cover letters; fall back to
+                    // whatever was persisted locally if the query failed.
+                    if (coverLetters) {
+                        set({
+                            savedCoverLetters: coverLetters.map((cl: any) => ({
+                                ...cl,
+                                id: cl._id,
+                            })),
+                        });
+                    }
+
+                    get().refreshScanUsage();
 
                     if (resumes && resumes.length > 0) {
                         const loadedResumes = resumes as unknown as Resume[];
@@ -173,9 +209,8 @@ export const useResumeStore = create<ResumeState>()(
 
                 try {
                     const { resume } = get();
-                    const isDraft = !resume.id || resume.id === 'draft' || resume.id.includes('-');
 
-                    if (!isDraft) {
+                    if (!isDraftId(resume.id)) {
                         await convex.mutation(api.resumes.update, {
                             id: resume.id as any,
                             title: resume.title,
@@ -209,7 +244,7 @@ export const useResumeStore = create<ResumeState>()(
                     }
 
                 } catch (err: any) {
-                    // Silently handle auth failures — the Convex client may not have
+                    // Silently handle auth failures. The Convex client may not have
                     // the Clerk JWT yet if the user just signed in. Local persistence
                     // still works via Zustand's persist middleware.
                     const errorString = String(err);
@@ -285,10 +320,7 @@ export const useResumeStore = create<ResumeState>()(
 
                 // Convex delete
                 try {
-                    // Check if it's a real Convex ID (not draft UUID)
-                    // UUIDs are typically 36 chars with dashes. Convex IDs are base62.
-                    const isDraft = id === 'draft' || (id.length === 36 && id.includes('-'));
-                    if (!isDraft) {
+                    if (!isDraftId(id)) {
                         await convex.mutation(api.resumes.deleteResume, { id: id as any });
                     }
                 } catch (error) {
@@ -297,11 +329,11 @@ export const useResumeStore = create<ResumeState>()(
                 }
             },
 
-            createNewCoverLetter: () => {
+            createNewCoverLetter: async () => {
                 const { savedCoverLetters } = get();
                 const count = (savedCoverLetters || []).length + 1;
                 const newCL = {
-                    id: uuidv4(),
+                    id: uuidv4(), // Draft id until Convex assigns a real one
                     title: `Cover Letter #${count}`,
                     jobTitle: '',
                     company: '',
@@ -309,14 +341,88 @@ export const useResumeStore = create<ResumeState>()(
                     body: '',
                 };
                 set({ coverLetter: newCL, savedCoverLetters: [...(savedCoverLetters || []), newCL] });
+
+                try {
+                    const newId = await convex.mutation(api.coverLetters.create, {
+                        title: newCL.title,
+                        jobTitle: '',
+                        company: '',
+                        recipient: '',
+                        body: '',
+                    });
+
+                    const persisted = { ...newCL, id: newId as unknown as string };
+                    set((state) => ({
+                        coverLetter: persisted,
+                        savedCoverLetters: (state.savedCoverLetters || []).map((cl: any) =>
+                            cl.id === newCL.id ? persisted : cl
+                        ),
+                    }));
+                } catch (err) {
+                    // Keep the local draft. saveCurrentCoverLetter will retry the sync.
+                    console.warn('Cover letter not synced to Convex yet:', err);
+                }
             },
 
-            deleteCoverLetter: (id: string) => {
+            deleteCoverLetter: async (id: string) => {
                 const { savedCoverLetters, coverLetter } = get();
                 const newSaved = (savedCoverLetters || []).filter((cl: any) => cl.id !== id);
                 set({ savedCoverLetters: newSaved });
                 if (coverLetter?.id === id) {
                     set({ coverLetter: { title: 'Untitled Cover Letter', jobTitle: '', company: '', recipient: '', body: '' } });
+                }
+
+                try {
+                    if (!isDraftId(id)) {
+                        await convex.mutation(api.coverLetters.remove, { id: id as any });
+                    }
+                } catch (err) {
+                    console.error('Failed to delete cover letter from Convex', err);
+                }
+            },
+
+            saveCurrentCoverLetter: async () => {
+                const { coverLetter, savedCoverLetters } = get();
+                if (!coverLetter) return;
+
+                // Mirror into the local list so the dashboard updates immediately.
+                const index = (savedCoverLetters || []).findIndex((cl: any) => cl.id === coverLetter.id);
+                const nextSaved = index >= 0
+                    ? (savedCoverLetters || []).map((cl: any) => (cl.id === coverLetter.id ? coverLetter : cl))
+                    : [...(savedCoverLetters || []), coverLetter];
+                set({ savedCoverLetters: nextSaved });
+
+                const payload = {
+                    title: coverLetter.title || 'Untitled Cover Letter',
+                    jobTitle: coverLetter.jobTitle || '',
+                    company: coverLetter.company || '',
+                    recipient: coverLetter.recipient || '',
+                    body: coverLetter.body || '',
+                };
+
+                try {
+                    if (isDraftId(coverLetter.id)) {
+                        const newId = await convex.mutation(api.coverLetters.create, payload);
+                        const persisted = { ...coverLetter, id: newId as unknown as string };
+                        set((state) => ({
+                            coverLetter: persisted,
+                            savedCoverLetters: (state.savedCoverLetters || []).map((cl: any) =>
+                                cl.id === coverLetter.id ? persisted : cl
+                            ),
+                        }));
+                    } else {
+                        await convex.mutation(api.coverLetters.update, {
+                            id: coverLetter.id as any,
+                            ...payload,
+                        });
+                    }
+                } catch (err) {
+                    const errorString = String(err);
+                    if (errorString.includes('Unauthenticated') || errorString.includes('Not authenticated')) {
+                        console.warn('Cover letter sync skipped (not authenticated yet). Saved locally.');
+                    } else {
+                        console.error('Failed to sync cover letter to Convex', err);
+                    }
                 }
             },
 
@@ -521,21 +627,12 @@ export const useResumeStore = create<ResumeState>()(
 
             runATSAnalysis: () => {
                 const state = get();
-                // Simple debounce could go here if needed, but for now we just run it.
-                // Analysis is fast enough (regex on small text).
+                // Local, synchronous scoring, cheap enough to run on every edit.
+                // NOTE: this deliberately does NOT touch stats.totalReviews. It is
+                // called from every form mutation, so incrementing here counted a
+                // "review" per keystroke and made the dashboard metric meaningless.
+                // Reviews are counted explicitly via incrementReviewCount().
                 const result = analyzeResume(state.resume, state.jobDescription || '');
-
-                // Only increment stats if score > 0 to avoid counting initial empty analysis
-                if (result.overallScore > 0) {
-                    // We need to be careful not to infinite loop if we put it here and it triggers updates.
-                    // But stats is separate.
-                    // Actually, let's just increment it here safely.
-                    set((state) => ({
-                        stats: {
-                            totalReviews: state.stats.totalReviews + 1
-                        }
-                    }));
-                }
 
                 set({
                     atsScore: result.overallScore,
@@ -544,6 +641,108 @@ export const useResumeStore = create<ResumeState>()(
                     matchedKeywords: result.matchedKeywords,
                     missingKeywords: result.missingKeywords,
                 });
+            },
+
+            refreshScanUsage: async () => {
+                try {
+                    const res = await fetch('/api/job-scan');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    set({
+                        scanUsage: {
+                            used: data.used ?? 0,
+                            limit: data.limit ?? null,
+                            blocked: data.limit !== null && (data.used ?? 0) >= data.limit,
+                        },
+                    });
+                } catch {
+                    // Non-fatal: the server re-checks the quota on every scan anyway.
+                }
+            },
+
+            recordAnalysis: async (resumeTitle: string) => {
+                const state = get();
+                const categories = Object.values(state.categoryScores || {});
+                if (categories.length === 0) return;
+
+                const feedback = (state.atsFeedback || []) as ATSFeedback[];
+                const jd = (state.jobDescription || '').trim();
+
+                try {
+                    await convex.mutation(api.analyses.record, {
+                        resumeId: isDraftId(state.resume.id) ? undefined : (state.resume.id as any),
+                        resumeTitle: resumeTitle || 'Untitled Resume',
+                        overallScore: state.atsScore ?? 0,
+                        categoryScores: categories.map((c: any) => ({
+                            name: c.name,
+                            score: c.score,
+                            maxScore: c.maxScore,
+                        })),
+                        issueCounts: {
+                            errors: feedback.filter((f) => f.type === 'error').length,
+                            warnings: feedback.filter((f) => f.type === 'warning').length,
+                            successes: feedback.filter((f) => f.type === 'success').length,
+                        },
+                        feedback: feedback.map((f) => ({
+                            category: f.category,
+                            message: f.message,
+                            detail: f.detail,
+                            solution: f.solution,
+                            type: f.type,
+                            scoreImpact: f.scoreImpact,
+                        })),
+                        jobDescriptionPreview: jd ? jd.slice(0, 300) : undefined,
+                        missingKeywords: state.missingKeywords ?? [],
+                    });
+                } catch (err) {
+                    // History is a convenience, never block the analysis on it.
+                    console.error('Failed to save analysis to history', err);
+                }
+            },
+
+            commitJobScan: async () => {
+                const state = get();
+                const jd = (state.jobDescription || '').trim();
+                if (jd.length < 50) return;
+
+                try {
+                    const res = await fetch('/api/job-scan', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jobDescription: jd,
+                            atsScore: state.atsScore ?? 0,
+                            matchedKeywords: state.matchedKeywords ?? [],
+                            missingKeywords: state.missingKeywords ?? [],
+                            resumeId: isDraftId(state.resume.id) ? undefined : state.resume.id,
+                        }),
+                    });
+
+                    const data = await res.json();
+
+                    if (res.status === 402) {
+                        set({
+                            scanUsage: {
+                                used: data.used ?? 0,
+                                limit: data.limit ?? null,
+                                blocked: true,
+                            },
+                        });
+                        return;
+                    }
+
+                    if (res.ok) {
+                        set({
+                            scanUsage: {
+                                used: data.used ?? 0,
+                                limit: data.limit ?? null,
+                                blocked: false,
+                            },
+                        });
+                    }
+                } catch (err) {
+                    console.error('Failed to record job scan', err);
+                }
             },
             improveResumeWithAI: async () => {
                 set({ isLoading: true });
@@ -561,6 +760,11 @@ export const useResumeStore = create<ResumeState>()(
                     });
 
                     const data = await response.json();
+
+                    if (response.status === 402) {
+                        toast.error(data.message || 'This feature requires Shortlist Pro.');
+                        return;
+                    }
 
                     if (data.success && data.resume) {
                         // Preserve IDs from original resume
@@ -592,22 +796,38 @@ export const useResumeStore = create<ResumeState>()(
                                 description: proj.description || ''
                             })) : state.resume.projects,
 
+                            leadership: Array.isArray(data.resume.leadership) && data.resume.leadership.length > 0 ? data.resume.leadership.map((item: any, i: number) => ({
+                                ...item,
+                                id: state.resume.leadership?.[i]?.id || uuidv4(),
+                                description: item.description || ''
+                            })) : state.resume.leadership,
+
                             customStyles: data.resume.customStyles || state.resume.customStyles
                         };
 
-                        // Update template selection if AI suggests a different theme
-                        if (data.resume.customStyles?.theme && ['modern', 'classic', 'minimal'].includes(data.resume.customStyles.theme)) {
-                            get().setTemplate(data.resume.customStyles.theme);
-                        }
+                        // NOTE: this used to call setTemplate() with the AI's suggested
+                        // theme, silently switching the template the user had chosen.
+                        // The template is the user's decision; the server now echoes
+                        // their existing styles back unless they asked for a change.
 
                         set({ resume: improvedResume, isPreviewVisible: true });
+
+                        // Tell the user what actually changed, so a subtle rewrite
+                        // never looks like "nothing happened".
+                        const changes: string[] = Array.isArray(data.changesMade) ? data.changesMade : [];
+                        toast.success(
+                            changes.length > 0
+                                ? `Resume optimized. ${changes.length} improvement${changes.length === 1 ? '' : 's'} applied.`
+                                : 'Resume optimized.'
+                        );
                     } else {
                         console.error('AI Generation failed:', data.error);
-                        alert('Failed to generate: ' + (data.error || 'Unknown error'));
+                        // data.error is already a user-safe message from the API route.
+                        toast.error(data.error || 'Something went wrong optimizing your resume. Please try again.');
                     }
                 } catch (error) {
                     console.error('API Error:', error);
-                    alert('Failed to connect to AI service');
+                    toast.error('Could not reach the AI service. Please check your connection and try again.');
                 } finally {
                     set({ isLoading: false });
                     get().runATSAnalysis();
@@ -642,6 +862,10 @@ export const useResumeStore = create<ResumeState>()(
                     });
 
                     const data = await response.json();
+                    if (response.status === 402) {
+                        toast.error(data.message || 'Cover letter generation requires Shortlist Pro.');
+                        return;
+                    }
                     if (data.success && data.content) {
                         set((state) => ({
                             coverLetter: {
@@ -649,11 +873,13 @@ export const useResumeStore = create<ResumeState>()(
                                 body: data.content
                             }
                         }));
+                        await get().saveCurrentCoverLetter();
                     } else {
-                        alert(data.error || 'Failed to generate cover letter');
+                        // data.error is already a user-safe message from the API route.
+                        toast.error(data.error || 'Something went wrong generating your cover letter. Please try again.');
                     }
                 } catch (e: any) {
-                    alert('Error reaching AI: ' + e.message);
+                    toast.error('Could not reach the AI service. Please check your connection and try again.');
                 } finally {
                     set({ isLoading: false });
                 }
@@ -720,10 +946,13 @@ export const useResumeStore = create<ResumeState>()(
         }), {
         name: 'shortlist-storage',
         partialize: (state) => ({
+            // Local mirror for instant paint before Convex responds. Convex is
+            // the source of truth and overwrites both on initialize().
             savedResumes: state.savedResumes,
             savedCoverLetters: state.savedCoverLetters,
             stats: state.stats,
             // resume, coverLetter, viewMode are NOT persisted.
             // They are session-scoped and reset on each builder visit.
+            // scanUsage is NOT persisted, quota is server-authoritative.
         }),
     }));

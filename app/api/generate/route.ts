@@ -2,20 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
 import fs from 'fs';
 import path from 'path';
-import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
 import { generateResumeSchema, safeParseBody } from '@/lib/validations';
+import { getEntitlement, PRO_REQUIRED_RESPONSE } from '@/lib/subscription-server';
 
 export async function POST(request: NextRequest) {
     try {
         // 1. Authentication Check
-        const { userId } = await auth();
+        const { userId, isPro } = await getEntitlement();
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // 1b. AI optimization is a Pro feature (PRD §7: "Full optimization").
+        //     The UI hides this behind an upgrade prompt, but the check has to
+        //     live here, the route is reachable directly.
+        if (!isPro) {
+            return NextResponse.json(PRO_REQUIRED_RESPONSE, { status: 402 });
+        }
+
         // 2. Rate Limiting Check
-        const decision = await arcjet_client.protect(request, { userId });
+        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
@@ -73,50 +80,103 @@ The "INPUT RESUME DATA" is the **single source of truth**.
 - If it contains data, **PRESERVE IT**. Do not add extra schools or jobs.
 - If it is empty, generate a sample.
 - **NEVER use "University of Applied Sciences".**
-- Return ONLY valid JSON adhering to the schema defined above.`;
+- Return ONLY valid JSON adhering to the schema defined above.
+- "refined_content" is REQUIRED. Returning style tokens without rewritten
+  content is a failed response.`;
 
         const data = await generateContentWithFallback(prompt, apiKey, {
-            temperature: 0.7,
+            // Low temperature: this is factual copy editing over the user's real
+            // history, not creative writing. High values invented details.
+            temperature: 0.35,
             maxOutputTokens: 8192,
         });
 
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!content) {
-            return NextResponse.json({ error: 'No response from AI' }, { status: 500 });
+            console.error('Resume optimization: model returned no text');
+            return NextResponse.json(
+                { error: 'The AI did not return a result. Please try again.' },
+                { status: 502 }
+            );
         }
 
         // Clean up the response - remove markdown code blocks if present
         content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
-        const designEngineOutput = JSON.parse(content);
+        let designEngineOutput: any;
+        try {
+            designEngineOutput = JSON.parse(content);
+        } catch {
+            console.error('Resume optimization: model returned non-JSON:', content.slice(0, 500));
+            return NextResponse.json(
+                { error: 'The AI returned an unreadable result. Please try again.' },
+                { status: 502 }
+            );
+        }
 
-        // Map Design Engine output to our internal Resume structure
+        const refined = designEngineOutput.refined_content || designEngineOutput.minimized_content;
+
+        // Guard against the silent no-op: if the model returns only style tokens,
+        // the client would merge nothing but colors and the user sees their
+        // content unchanged with a recoloured header. Treat that as a failure.
+        const hasUsableContent =
+            refined &&
+            typeof refined === 'object' &&
+            (
+                (typeof refined.profile?.summary === 'string' && refined.profile.summary.trim().length > 0) ||
+                (Array.isArray(refined.experience) && refined.experience.length > 0) ||
+                (Array.isArray(refined.education) && refined.education.length > 0) ||
+                (Array.isArray(refined.skills) && refined.skills.length > 0) ||
+                (Array.isArray(refined.projects) && refined.projects.length > 0)
+            );
+
+        if (!hasUsableContent) {
+            console.error(
+                'Resume optimization: model returned no usable content. Keys:',
+                Object.keys(designEngineOutput || {})
+            );
+            return NextResponse.json(
+                { error: 'The AI could not rewrite this resume. Please try again.' },
+                { status: 502 }
+            );
+        }
+
+        // Style tokens fall back to the user's EXISTING styles, never to a
+        // hardcoded theme. Defaulting to 'modern'/blue here is what silently
+        // recoloured resumes whose owner had deliberately picked another template.
+        const existingStyles = (resume as any)?.customStyles ?? {};
+        const tokens = designEngineOutput.style_tokens ?? {};
+
         const improvedResume = {
-            ...(designEngineOutput.refined_content || designEngineOutput.minimized_content || {}),
+            ...refined,
             customStyles: {
-                accentColor: designEngineOutput.style_tokens?.accentColor || '#3B82F6',
-                primaryColor: designEngineOutput.style_tokens?.primaryColor || '#111827',
-                fontBody: designEngineOutput.style_tokens?.fontBody || 'Open Sans',
-                fontHeading: designEngineOutput.style_tokens?.fontHeading || 'Inter',
-                theme: designEngineOutput.style_tokens?.theme || 'modern',
-                headingWeight: designEngineOutput.style_tokens?.headingWeight || '700',
-                bodyWeight: designEngineOutput.style_tokens?.bodyWeight || '400',
-                sectionDividerStyle: designEngineOutput.style_tokens?.sectionDividerStyle || 'solid_line',
-                bulletStyle: designEngineOutput.style_tokens?.bulletStyle || 'disc'
+                accentColor: tokens.accentColor || existingStyles.accentColor || '#3B82F6',
+                primaryColor: tokens.primaryColor || existingStyles.primaryColor || '#111827',
+                fontBody: tokens.fontBody || existingStyles.fontBody || 'Open Sans',
+                fontHeading: tokens.fontHeading || existingStyles.fontHeading || 'Inter',
+                theme: tokens.theme || existingStyles.theme || 'modern',
+                headingWeight: tokens.headingWeight || existingStyles.headingWeight || '700',
+                bodyWeight: tokens.bodyWeight || existingStyles.bodyWeight || '400',
+                sectionDividerStyle: tokens.sectionDividerStyle || existingStyles.sectionDividerStyle || 'solid_line',
+                bulletStyle: tokens.bulletStyle || existingStyles.bulletStyle || 'disc',
             },
-            designCritique: designEngineOutput.critique ? JSON.stringify(designEngineOutput.critique) : undefined
+            designCritique: designEngineOutput.critique ? JSON.stringify(designEngineOutput.critique) : undefined,
         };
 
         return NextResponse.json({
             success: true,
-            resume: improvedResume
+            resume: improvedResume,
+            changesMade: Array.isArray(designEngineOutput.changes_made)
+                ? designEngineOutput.changes_made
+                : [],
         });
 
     } catch (error: any) {
-        console.error('Gemini API Error:', error);
+        // Full detail stays server-side only.
+        console.error('Resume optimization failed:', error);
         return NextResponse.json({
-            error: error.message || 'Failed to generate resume'
+            error: 'Something went wrong optimizing your resume. Please try again.'
         }, { status: 500 });
     }
 }

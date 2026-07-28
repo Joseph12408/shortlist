@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
         const { userId } = await auth();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const decision = await arcjet_client.protect(request, { userId });
+        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
@@ -120,9 +120,10 @@ ${text}
         });
 
     } catch (error: any) {
-        console.error('Parse API Error:', error);
+        // Full detail stays server-side only.
+        console.error('Resume parsing failed:', error);
         return NextResponse.json({
-            error: error.message || 'Failed to parse resume'
+            error: 'Something went wrong reading your resume. Please try a different file.'
         }, { status: 500 });
     }
 }

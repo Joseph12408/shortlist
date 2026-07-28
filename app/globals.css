@@ -123,3 +123,39 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ─── Resume preview scaling ──────────────────────────────────────────────
+   The preview renders at a true A4 width (210mm ≈ 794px) so the on-screen
+   layout matches the exported PDF exactly. That does not fit on a phone, so
+   it is scaled down responsively.
+
+   `transform: scale()` does not affect layout size, so the element would still
+   reserve its full unscaled height and leave a large gap underneath. The
+   negative margin reclaims exactly the height the transform removed. */
+.resume-preview-scaler {
+  --preview-scale: 0.42;
+  transform: scale(var(--preview-scale));
+  transform-origin: top center;
+  margin-bottom: calc(-297mm * (1 - var(--preview-scale)));
+}
+
+@media (min-width: 420px) {
+  .resume-preview-scaler { --preview-scale: 0.52; }
+}
+@media (min-width: 640px) {
+  .resume-preview-scaler { --preview-scale: 0.72; }
+}
+@media (min-width: 1024px) {
+  .resume-preview-scaler { --preview-scale: 0.6; }
+}
+@media (min-width: 1280px) {
+  .resume-preview-scaler { --preview-scale: 0.75; }
+}
+@media (min-width: 1536px) {
+  .resume-preview-scaler { --preview-scale: 0.85; }
+}
+
+/* Hide scrollbars on the horizontally scrollable dashboard tab strip while
+   keeping it scrollable by touch/trackpad. */
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

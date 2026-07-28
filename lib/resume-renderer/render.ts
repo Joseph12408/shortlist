@@ -1,6 +1,66 @@
+import fs from 'fs';
 import { Resume } from '@/types/resume';
 
-export async function generatePDF(resumeData: Resume): Promise<Buffer> {
+export interface RenderOptions {
+    /** Free-tier exports carry a watermark; Pro exports are clean. */
+    watermark?: boolean;
+}
+
+/**
+ * Locate a Chromium binary for local development.
+ *
+ * `npm i puppeteer` does not always land its bundled Chrome (corporate proxies,
+ * PUPPETEER_SKIP_DOWNLOAD, a pruned cache), and when it is missing puppeteer
+ * throws "Could not find Chrome" at launch time. Since every Chromium build
+ * drives the same DevTools protocol, fall back to whatever browser the machine
+ * already has rather than failing the export.
+ *
+ * Returns undefined to let puppeteer use its own bundled download.
+ */
+function resolveDevExecutablePath(puppeteer: any): string | undefined {
+    // 1. Puppeteer's own managed Chrome, when the download actually happened.
+    try {
+        const bundled = puppeteer.executablePath?.();
+        if (bundled && fs.existsSync(bundled)) return bundled;
+    } catch {
+        // executablePath() throws when nothing has been downloaded.
+    }
+
+    // 2. Any Chromium-family browser already installed on this machine.
+    const candidates =
+        process.platform === 'win32'
+            ? [
+                  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+                  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+              ]
+            : process.platform === 'darwin'
+              ? [
+                    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+                    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+                ]
+              : [
+                    '/usr/bin/google-chrome',
+                    '/usr/bin/chromium',
+                    '/usr/bin/chromium-browser',
+                    '/usr/bin/microsoft-edge',
+                ];
+
+    for (const path of candidates) {
+        if (fs.existsSync(path)) {
+            console.log('[PDF] Using system browser for local render:', path);
+            return path;
+        }
+    }
+
+    throw new Error(
+        'No Chromium browser found for PDF rendering. Run "npx puppeteer browsers install chrome", or install Google Chrome.'
+    );
+}
+
+export async function generatePDF(resumeData: Resume, options: RenderOptions = {}): Promise<Buffer> {
     let browser = null;
 
     try {
@@ -13,6 +73,7 @@ export async function generatePDF(resumeData: Resume): Promise<Buffer> {
             if (puppeteer.default) puppeteer = puppeteer.default;
             pptrArgs = {
                 headless: true,
+                executablePath: resolveDevExecutablePath(puppeteer),
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -36,7 +97,7 @@ export async function generatePDF(resumeData: Resume): Promise<Buffer> {
             };
         }
 
-        const html = buildResumeHTML(resumeData);
+        const html = buildResumeHTML(resumeData, options);
         if (!html) {
             console.error("❌ PDF Generation: HTML build returned empty.");
             throw new Error("HTML content is empty");
@@ -280,23 +341,83 @@ a { color: inherit; text-decoration: none; }
 .inline-block { display: inline-block; }
 </style>
 </head><body>
-<div style="width:210mm;height:297mm;background:white;overflow:hidden;${bodyStyle || ''}">
+<div id="page-root" style="position:relative;width:210mm;height:297mm;background:white;overflow:hidden;${bodyStyle || ''}">
 ${body}
 </div></body></html>`;
 }
 
-function buildResumeHTML(resume: Resume): string {
+/**
+ * Overlay a diagonal watermark on a rendered page.
+ *
+ * Injected after the fact rather than threaded through all seven template
+ * builders. `wrap()` always emits the `#page-root` container, so this hooks
+ * onto a single known marker. `pointer-events:none` and a high z-index keep it
+ * above the content without disturbing layout.
+ */
+function applyWatermark(html: string): string {
+    const style = `
+<style>
+#sl-watermark {
+    position: absolute;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+#sl-watermark span {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(15, 23, 42, 0.10);
+    transform: rotate(-35deg);
+    white-space: nowrap;
+}
+#sl-watermark small {
+    position: absolute;
+    bottom: 10mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: rgba(15, 23, 42, 0.35);
+}
+</style>`;
+
+    const overlay = `
+<div id="sl-watermark">
+    <span>Made with Shortlist</span>
+    <small>Upgrade to Shortlist Pro to export without this watermark. shortlist.ink/pricing</small>
+</div>`;
+
+    return html
+        .replace('</head>', `${style}\n</head>`)
+        .replace(/(<div id="page-root"[^>]*>)/, `$1${overlay}`);
+}
+
+/** Exported for testing the watermark injection without launching Chrome. */
+export function buildResumeHTML(resume: Resume, options: RenderOptions = {}): string {
     const theme = resume.customStyles?.theme || 'modern';
+    let html: string;
+
     switch (theme) {
-        case 'classic':        return buildClassicHTML(resume);
-        case 'minimal':        return buildMinimalHTML(resume);
-        case 'efficient':      return buildEfficientHTML(resume);
-        case 'sidebar':        return buildSidebarHTML(resume, false);
-        case 'sidebar_right':  return buildSidebarHTML(resume, true);
-        case 'banner':         return buildBannerHTML(resume);
-        case 'standard':       return buildStandardHTML(resume);
-        default:               return buildModernHTML(resume);
+        case 'classic':        html = buildClassicHTML(resume); break;
+        case 'minimal':        html = buildMinimalHTML(resume); break;
+        case 'efficient':      html = buildEfficientHTML(resume); break;
+        case 'sidebar':        html = buildSidebarHTML(resume, false); break;
+        case 'sidebar_right':  html = buildSidebarHTML(resume, true); break;
+        case 'banner':         html = buildBannerHTML(resume); break;
+        case 'standard':       html = buildStandardHTML(resume); break;
+        default:               html = buildModernHTML(resume); break;
     }
+
+    return options.watermark ? applyWatermark(html) : html;
 }
 
 // ─── MODERN ───────────────────────────────────────────────────────

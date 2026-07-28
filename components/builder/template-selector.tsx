@@ -3,46 +3,38 @@
 import { Label } from "@/components/ui/label";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { cn } from "@/lib/utils";
-import { Lock, Check } from "lucide-react";
-import { useState } from "react";
-import { UpgradeModal } from "@/components/upgrade-modal";
-import { Button } from "@/components/ui/button";
+import { Lock } from "lucide-react";
+
 import { useRouter } from "next/navigation";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { isTemplateFree } from "@/lib/tiers";
 
 export function TemplateSelector() {
-    const {
-        setTemplate,
-        subscriptionStatus,
-        setColors,
-        resume,
-        applySelectedTemplate,
-    } = useResumeStore();
+    // NOTE: `subscriptionStatus` and `applySelectedTemplate` were destructured
+    // here but never existed on the store. Tier now comes from useFeatureAccess
+    // and setTemplate applies immediately, so no Apply button is needed.
+    const { setTemplate, setColors, resume } = useResumeStore();
     const { customStyles } = resume;
     const currentTheme = customStyles?.theme || 'modern';
-    const [showUpgrade, setShowUpgrade] = useState(false);
+
     const router = useRouter();
     const { isPro } = useFeatureAccess();
 
-    // Check if the current preview matches the saved theme
-    // We need to be careful with theme case/defaults logic, but generally they should match
-    // We need to be careful with theme case/defaults logic, but generally they should match
-    const isUnsaved = false; // With the new architecture, setTemplate applies immediately.
-
+    // Tier comes from lib/tiers so this list and /templates cannot drift apart.
     const templates = [
-        { id: 'standard', name: 'Standard (Best)', color: 'bg-stone-50 border-2 border-stone-800', premium: false },
-        { id: 'sidebar', name: 'Creative Left', color: 'bg-blue-100 border-l-4 border-blue-500', premium: true },
-        { id: 'sidebar_right', name: 'Creative Right', color: 'bg-green-100 border-r-4 border-green-500', premium: true },
-        { id: 'banner', name: 'Executive Banner', color: 'bg-slate-100 border-t-4 border-slate-700', premium: true },
-        { id: 'efficient', name: 'Efficient', color: 'bg-blue-50', premium: true },
-        { id: 'classic', name: 'Classic', color: 'bg-slate-200', premium: false },
-        { id: 'modern', name: 'Modern', color: 'bg-indigo-900', premium: true },
-        { id: 'minimal', name: 'Minimal', color: 'bg-white border', premium: false },
-    ];
+        { id: 'standard', name: 'Standard (Best)', color: 'bg-stone-50 border-2 border-stone-800' },
+        { id: 'sidebar', name: 'Creative Left', color: 'bg-blue-100 border-l-4 border-blue-500' },
+        { id: 'sidebar_right', name: 'Creative Right', color: 'bg-green-100 border-r-4 border-green-500' },
+        { id: 'banner', name: 'Executive Banner', color: 'bg-slate-100 border-t-4 border-slate-700' },
+        { id: 'efficient', name: 'Efficient', color: 'bg-blue-50' },
+        { id: 'classic', name: 'Classic', color: 'bg-slate-200' },
+        { id: 'modern', name: 'Modern', color: 'bg-indigo-900' },
+        { id: 'minimal', name: 'Minimal', color: 'bg-white border' },
+    ].map((t) => ({ ...t, premium: !isTemplateFree(t.id) }));
 
-    const handleSelect = (id: any, premium: boolean) => {
+    const handleSelect = (id: string, premium: boolean) => {
         if (premium && !isPro) {
-            setShowUpgrade(true);
+            router.push('/pricing');
             return;
         }
         setTemplate(id);
@@ -50,31 +42,16 @@ export function TemplateSelector() {
 
     return (
         <>
-            <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} />
+
             <div className="grid gap-8">
                 <div className="grid gap-4">
                     <div className="flex items-center justify-between">
                         <Label className="text-base font-semibold">Choose Template</Label>
-                        <Button
-                            onClick={applySelectedTemplate}
-                            disabled={!isUnsaved}
-                            size="sm"
-                            className={cn(
-                                "transition-all duration-300",
-                                isUnsaved
-                                    ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg hover:scale-105"
-                                    : "bg-green-100 text-green-700 hover:bg-green-100 opacity-100"
-                            )}
-                        >
-                            {!isUnsaved ? (
-                                <>
-                                    <Check className="w-4 h-4 mr-1" />
-                                    Applied
-                                </>
-                            ) : (
-                                "Apply Template"
-                            )}
-                        </Button>
+                        {!isPro && (
+                            <span className="text-xs text-muted-foreground">
+                                {templates.filter((t) => t.premium).length} locked on Free
+                            </span>
+                        )}
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                         {templates.map((t) => (

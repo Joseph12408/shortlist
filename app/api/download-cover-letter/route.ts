@@ -1,20 +1,25 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateCoverLetterPDF } from '@/lib/resume-renderer/render-cover-letter';
-import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
 import { downloadCoverLetterSchema, safeParseBody } from '@/lib/validations';
+import { getEntitlement, PRO_REQUIRED_RESPONSE } from '@/lib/subscription-server';
 
 export async function POST(req: NextRequest) {
     try {
         // 1. Authentication
-        const { userId } = await auth();
+        const { userId, isPro } = await getEntitlement();
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Cover letter export is Pro-only (PRD §7: "resume + cover letter export").
+        if (!isPro) {
+            return NextResponse.json(PRO_REQUIRED_RESPONSE, { status: 402 });
+        }
+
         // 2. Rate Limiting
-        const decision = await arcjet_client.protect(req, { userId });
+        const decision = await arcjet_client.protect(req, { userId, requested: 1 });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
@@ -44,9 +49,10 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error('Error generating Cover Letter PDF:', error);
+        // Full detail stays server-side only.
+        console.error('Cover letter PDF generation failed:', error);
         return NextResponse.json(
-            { error: 'Failed to generate PDF', details: error.message },
+            { error: 'Something went wrong generating your cover letter PDF. Please try again.' },
             { status: 500 }
         );
     }

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { useResumeStore } from "@/lib/store/useResumeStore";
-import { createClient } from "@/lib/supabase/client";
 
 export function useResumePersistence() {
     const { resume, initialLoadDone, initialize, saveCurrentResume } = useResumeStore();

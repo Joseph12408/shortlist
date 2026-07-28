@@ -1,6 +1,7 @@
 
 import { NextRequest } from "next/server";
 import { createClerkClient } from "@clerk/nextjs/server";
+import { verifyWhopSignature } from "@/lib/whop-signature";
 
 // Initialize Clerk Backend client
 const clerk = createClerkClient({
@@ -16,6 +17,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (!webhookSecret) {
       console.error("[WHOP WEBHOOK] Missing WHOP_WEBHOOK_SECRET");
       return new Response("Server misconfigured", { status: 500 });
+    }
+
+    const signatureHeader =
+      request.headers.get("x-whop-signature") ??
+      request.headers.get("whop-signature");
+
+    if (!verifyWhopSignature(requestBodyText, signatureHeader, webhookSecret)) {
+      console.error("[WHOP WEBHOOK] Invalid or missing signature, request rejected");
+      return new Response("Invalid signature", { status: 401 });
     }
 
     // Parse the webhook payload

@@ -24,12 +24,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { DashboardHeader } from "@/components/layout/dashboard-nav";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardPage() {
-  const { resume, savedResumes, savedCoverLetters, createNewResume, stats } = useResumeStore();
+  const { resume, savedResumes, savedCoverLetters, createNewResume } = useResumeStore();
   const router = useRouter();
   const { user } = useUser();
   const [mounted, setMounted] = useState(false);
+  const analyses = useQuery(api.analyses.list);
 
   // Trigger progress bar animations on load
   useEffect(() => {
@@ -45,41 +50,38 @@ export default function DashboardPage() {
     router.push(`/builder?mode=edit&resumeId=${id}`);
   };
 
-  // Calculate stats from the live store
-  const scoredResumes = (savedResumes || []).filter(r => (r.atsScore || 0) > 0);
-  const avgScore = scoredResumes.length > 0
-    ? Math.round(scoredResumes.reduce((acc, curr) => acc + (curr.atsScore || 0), 0) / scoredResumes.length)
-    : 88; // Premium fallback if no reviews scored yet
+  // Average across real saved reviews. Shows 0 rather than an invented score
+  // when there is nothing to average, so the number is always trustworthy.
+  const reviewList = analyses ?? [];
+  const avgScore = reviewList.length > 0
+    ? Math.round(reviewList.reduce((acc: number, a: any) => acc + a.overallScore, 0) / reviewList.length)
+    : 0;
 
-  // Dynamic AI Grading Metrics from active resume or fallback
-  const contentRelevance = resume?.categoryScores?.Content
-    ? Math.round((resume.categoryScores.Content.score / resume.categoryScores.Content.maxScore) * 100)
-    : 90;
-  const formatting = resume?.categoryScores?.Structure
-    ? Math.round((resume.categoryScores.Structure.score / resume.categoryScores.Structure.maxScore) * 100)
-    : 85;
-  const keywordOpt = resume?.categoryScores?.Keywords
-    ? Math.round((resume.categoryScores.Keywords.score / resume.categoryScores.Keywords.maxScore) * 100)
-    : 92;
-  const toneAnalysis = resume?.categoryScores?.Writing
-    ? Math.round((resume.categoryScores.Writing.score / resume.categoryScores.Writing.maxScore) * 100)
-    : 84;
+  // Grading breakdown from the most recent review.
+  const latest: any = reviewList[0];
+  const categoryPct = (name: string) => {
+    const cat = latest?.categoryScores?.find((c: any) =>
+      c.name.toLowerCase().startsWith(name.toLowerCase())
+    );
+    if (!cat || !cat.maxScore) return 0;
+    return Math.round((cat.score / cat.maxScore) * 100);
+  };
 
-  // Compile real reviews or display high-fidelity mock ones when empty
-  const displayReviews = (savedResumes && savedResumes.length > 0)
-    ? savedResumes.slice(0, 3).map(r => ({
-        id: r.id,
-        title: r.title || "Untitled Resume",
-        role: r.experience?.[0]?.title || "Professional Profile",
-        date: "Updated recently",
-        score: r.atsScore || 75,
-        isDemo: false
-      }))
-    : [
-        { id: "demo-1", title: "Senior Product Designer.pdf", role: "Product Designer", date: "Oct 24, 2023", score: 94, isDemo: true },
-        { id: "demo-2", title: "Marketing Lead_V2.pdf", role: "Marketing Manager", date: "Oct 21, 2023", score: 78, isDemo: true },
-        { id: "demo-3", title: "Software Engineer.pdf", role: "Frontend Dev", date: "Oct 18, 2023", score: 86, isDemo: true }
-      ];
+  const contentRelevance = categoryPct("Content");
+  const formatting = categoryPct("ATS");
+  const keywordOpt = categoryPct("Job");
+  const toneAnalysis = categoryPct("Writing");
+
+  // Real saved reviews, newest first. undefined while the query is in flight.
+  const displayReviews = (analyses ?? []).slice(0, 3).map((a: any) => ({
+    id: a._id,
+    title: a.resumeTitle,
+    date: new Date(a._creationTime).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    }),
+    score: a.overallScore,
+  }));
 
   const hasResumes = (savedResumes || []).length > 0;
   const welcomeSubtext = hasResumes 
@@ -88,61 +90,21 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 pb-20">
-      {/* Sub-nav / Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="container mx-auto px-6 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
-                Welcome back, {user?.firstName || "Alex"}! <span className="animate-pulse">👋</span>
-              </h1>
-              <p className="text-slate-500 dark:text-slate-400 mt-1">
-                {welcomeSubtext}
-              </p>
-            </div>
-            <Button 
-              onClick={handleCreateResume}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl py-6 px-6 flex items-center gap-2 shadow-lg shadow-blue-500/20 active:scale-98 transition-all duration-200 group"
-            >
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
-              Upload Resume
-            </Button>
-          </div>
+      <DashboardHeader
+        title={<>Welcome back, {user?.firstName || "there"}! <span className="animate-pulse">👋</span></>}
+        description={welcomeSubtext}
+        action={
+          <Button
+            onClick={handleCreateResume}
+            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl py-6 px-6 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-98 transition-all duration-200 group"
+          >
+            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
+            Upload Resume
+          </Button>
+        }
+      />
 
-          <nav className="flex items-center gap-6 border-b border-transparent">
-            <Link 
-              href="/dashboard" 
-              className="pb-3 border-b-2 border-blue-600 font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-2 transition-all"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Overview
-            </Link>
-            <Link 
-              href="/dashboard/resumes" 
-              className="pb-3 border-b-2 border-transparent hover:border-slate-300 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all"
-            >
-              <Files className="w-4 h-4" />
-              My Resumes
-            </Link>
-            <Link 
-              href="/dashboard/cover-letters" 
-              className="pb-3 border-b-2 border-transparent hover:border-slate-300 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all"
-            >
-              <FileText className="w-4 h-4" />
-              Cover Letters
-            </Link>
-            <Link 
-              href="/analysis" 
-              className="pb-3 border-b-2 border-transparent hover:border-slate-300 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all"
-            >
-              <Brain className="w-4 h-4" />
-              AI Reviews
-            </Link>
-          </nav>
-        </div>
-      </div>
-
-      <main className="container mx-auto px-6 py-10 space-y-8 max-w-7xl">
+      <main className="container mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8 max-w-7xl">
         {/* Metrics Grid */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Total Resumes */}
@@ -151,9 +113,6 @@ export default function DashboardPage() {
               <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl">
                 <Files className="w-5 h-5" />
               </div>
-              <span className="text-emerald-500 text-xs font-semibold flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-full">
-                <TrendingUp className="w-3.5 h-3.5" /> +2
-              </span>
             </div>
             <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider">Total Resumes</p>
             <p className="text-3xl font-bold font-heading text-slate-900 dark:text-white mt-1">{(savedResumes || []).length}</p>
@@ -165,9 +124,6 @@ export default function DashboardPage() {
               <div className="p-3 bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 rounded-xl">
                 <FileText className="w-5 h-5" />
               </div>
-              <span className="text-emerald-500 text-xs font-semibold flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-full">
-                <TrendingUp className="w-3.5 h-3.5" /> +1
-              </span>
             </div>
             <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider">Cover Letters</p>
             <p className="text-3xl font-bold font-heading text-slate-900 dark:text-white mt-1">{(savedCoverLetters || []).length}</p>
@@ -179,10 +135,9 @@ export default function DashboardPage() {
               <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl">
                 <Zap className="w-5 h-5" />
               </div>
-              <span className="text-slate-400 dark:text-slate-500 text-xs bg-slate-50 dark:bg-slate-850 px-2 py-1 rounded-full font-medium">This Month</span>
             </div>
             <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider">AI Reviews</p>
-            <p className="text-3xl font-bold font-heading text-slate-900 dark:text-white mt-1">{stats?.totalReviews || 0}</p>
+            <p className="text-3xl font-bold font-heading text-slate-900 dark:text-white mt-1">{(analyses ?? []).length}</p>
           </div>
 
           {/* Avg. AI Rating */}
@@ -295,8 +250,8 @@ export default function DashboardPage() {
             <div>
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white">Recent Reviews</h3>
-                <Link 
-                  href="/dashboard/resumes" 
+                <Link
+                  href="/dashboard/reviews"
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-700 text-xs font-semibold hover:underline flex items-center gap-0.5"
                 >
                   View All
@@ -304,54 +259,64 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <div className="space-y-4">
-                {displayReviews.map((item, index) => {
-                  const isHigh = item.score >= 80;
-                  const isLow = item.score < 60;
-                  const scoreColor = isHigh 
-                    ? "text-emerald-500 dark:text-emerald-400" 
-                    : isLow 
-                    ? "text-red-500 dark:text-red-400" 
-                    : "text-amber-500 dark:text-amber-400";
-                  
-                  return (
-                    <div 
-                      key={item.id}
-                      onClick={() => !item.isDemo ? handleEdit(item.id) : handleCreateResume()}
-                      className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/40 rounded-xl group hover:border-blue-500/30 hover:bg-slate-100/30 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-200"
-                    >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform duration-200">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm truncate text-slate-800 dark:text-slate-200">{item.title}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-slate-400 font-medium truncate">{item.role}</span>
-                            {item.isDemo && (
-                              <span className="text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Demo</span>
-                            )}
+              {analyses === undefined ? (
+                <div className="space-y-4">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="h-[72px] w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : displayReviews.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">
+                    No reviews yet. Run one to see your score history here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {displayReviews.map((item) => {
+                    const scoreColor =
+                      item.score >= 80
+                        ? "text-emerald-500 dark:text-emerald-400"
+                        : item.score < 60
+                          ? "text-red-500 dark:text-red-400"
+                          : "text-amber-500 dark:text-amber-400";
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => router.push(`/dashboard/reviews/${item.id}`)}
+                        className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/40 rounded-xl group hover:border-blue-500/30 hover:bg-slate-100/30 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-200"
+                      >
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform duration-200">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm truncate text-slate-800 dark:text-slate-200">
+                              {item.title}
+                            </p>
+                            <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
                           </div>
                         </div>
+                        <div className="text-right pl-3">
+                          <p className={`font-bold font-heading text-lg ${scoreColor}`}>{item.score}</p>
+                          <p className="text-[9px] text-slate-400 uppercase font-semibold">Score</p>
+                        </div>
                       </div>
-                      <div className="text-right pl-3">
-                        <p className={`font-bold font-heading text-lg ${scoreColor}`}>{item.score}</p>
-                        <p className="text-[9px] text-slate-400 uppercase font-semibold">Score</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {!hasResumes && (
-              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-850">
-                <Button 
-                  onClick={handleCreateResume}
+            {analyses !== undefined && displayReviews.length === 0 && (
+              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <Button
+                  onClick={() => router.push("/analysis")}
                   variant="outline"
                   className="w-full text-xs font-semibold py-5 border-dashed border-slate-300 hover:border-blue-500 hover:text-blue-600 flex items-center justify-center gap-1.5"
                 >
-                  <Plus className="w-4 h-4" /> Create real review analysis
+                  <Plus className="w-4 h-4" /> Run your first AI review
                 </Button>
               </div>
             )}

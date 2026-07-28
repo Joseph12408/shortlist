@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
-import { auth } from '@clerk/nextjs/server';
 import arcjet_client from '@/lib/arcjet';
 import { generateCoverLetterSchema, safeParseBody } from '@/lib/validations';
+import { getEntitlement, PRO_REQUIRED_RESPONSE } from '@/lib/subscription-server';
 
 export async function POST(request: NextRequest) {
     try {
-        const { userId } = await auth();
+        const { userId, isPro } = await getEntitlement();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const decision = await arcjet_client.protect(request, { userId });
+        // Cover letter generation is Pro-only (PRD §7).
+        if (!isPro) {
+            return NextResponse.json(PRO_REQUIRED_RESPONSE, { status: 402 });
+        }
+
+        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
@@ -103,9 +108,10 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error('Cover Letter Gen Error:', error);
+        // Full detail stays server-side only.
+        console.error('Cover letter generation failed:', error);
         return NextResponse.json({
-            error: error.message || 'Failed to generate cover letter'
+            error: 'Something went wrong generating your cover letter. Please try again.'
         }, { status: 500 });
     }
 }

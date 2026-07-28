@@ -6,7 +6,10 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "strict": true
+        "strict": true,
+        /* Convex bundles the .ts sources directly. Emitting .js next to them
+           creates duplicate modules that silently shadow schema/function edits. */
+        "noEmit": true
     },
     "include": [
         "**/*"

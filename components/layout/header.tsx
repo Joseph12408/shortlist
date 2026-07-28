@@ -89,71 +89,95 @@ export function Header() {
                 </nav>
 
                 {/* Mobile Nav */}
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="md:hidden">
-                            <Menu className="h-5 w-5" />
-                            <span className="sr-only">Toggle menu</span>
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right">
-                        <div className="flex flex-col gap-6 mt-6">
-                            <Link href="/" className="flex items-center space-x-2">
-                                <img src="/logo.svg" alt="Shortlist Logo" className="h-5 w-5 text-primary" />
-                                <span className="font-heading text-lg font-bold">Shortlist</span>
-                            </Link>
-                            <nav className="flex flex-col gap-4">
-                                {/* Mobile: Signed OUT links */}
-                                <SignedOut>
-                                    <Link href="/#features" className="text-base font-medium">
-                                        Features
-                                    </Link>
-                                    <Link href="/#how-it-works" className="text-base font-medium">
-                                        How it Works
-                                    </Link>
-                                    <Link href="/#pricing" className="text-base font-medium">
-                                        Pricing
-                                    </Link>
-                                </SignedOut>
-
-                                {/* Mobile: Signed IN links */}
-                                <SignedIn>
-                                    <Link href="/dashboard" className="text-base font-medium text-primary">
-                                        Dashboard
-                                    </Link>
-                                    <Link href="/analysis" className="text-base font-medium text-muted-foreground">
-                                        AI Review
-                                    </Link>
-                                    <Link href="/pricing" className="text-base font-medium text-muted-foreground">
-                                        Pricing
-                                    </Link>
-                                </SignedIn>
-
-                                <div className="flex flex-col gap-2 mt-4">
-                                    <SignedOut>
-                                        <SignInButton mode="modal">
-                                            <Button variant="outline" className="w-full">
-                                                Log in
-                                            </Button>
-                                        </SignInButton>
-                                        <SignUpButton mode="modal">
-                                            <Button className="w-full">
-                                                Sign up
-                                            </Button>
-                                        </SignUpButton>
-                                    </SignedOut>
-                                    <SignedIn>
-                                        <div className="flex items-center gap-2">
-                                            <UserButton afterSignOutUrl="/" />
-                                            <span className="text-sm font-medium">Account</span>
-                                        </div>
-                                    </SignedIn>
-                                </div>
-                            </nav>
-                        </div>
-                    </SheetContent>
-                </Sheet>
+                <MobileNav />
             </div>
         </header>
+    );
+}
+
+/** Links in the mobile sheet, sized for touch and closing the sheet on tap. */
+function MobileNavLink({
+    href,
+    children,
+    onNavigate,
+}: {
+    href: string;
+    children: React.ReactNode;
+    onNavigate: () => void;
+}) {
+    return (
+        <Link
+            href={href}
+            onClick={onNavigate}
+            // min-h-11 keeps every row at a comfortable touch target.
+            className="flex items-center min-h-11 px-3 -mx-3 rounded-lg text-base font-medium text-foreground hover:bg-accent active:bg-accent transition-colors"
+        >
+            {children}
+        </Link>
+    );
+}
+
+function MobileNav() {
+    // Controlled so tapping a link closes the sheet. Radix does not close on
+    // client-side navigation by itself, which left the menu covering the page.
+    const [open, setOpen] = useState(false);
+    const close = () => setOpen(false);
+
+    return (
+        <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Toggle menu</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+                <div className="flex flex-col gap-6 h-full">
+                    <Link href="/" onClick={close} className="flex items-center space-x-2 pr-8">
+                        <img src="/logo.svg" alt="Shortlist Logo" className="h-5 w-5 text-primary" />
+                        <span className="font-heading text-lg font-bold">Shortlist</span>
+                    </Link>
+
+                    <nav className="flex flex-col gap-1">
+                        <SignedOut>
+                            <MobileNavLink href="/#features" onNavigate={close}>Features</MobileNavLink>
+                            <MobileNavLink href="/#how-it-works" onNavigate={close}>How it Works</MobileNavLink>
+                            <MobileNavLink href="/#pricing" onNavigate={close}>Pricing</MobileNavLink>
+                        </SignedOut>
+
+                        <SignedIn>
+                            <MobileNavLink href="/dashboard" onNavigate={close}>Dashboard</MobileNavLink>
+                            <MobileNavLink href="/dashboard/resumes" onNavigate={close}>My Resumes</MobileNavLink>
+                            <MobileNavLink href="/dashboard/cover-letters" onNavigate={close}>Cover Letters</MobileNavLink>
+                            <MobileNavLink href="/dashboard/reviews" onNavigate={close}>AI Reviews</MobileNavLink>
+                            <MobileNavLink href="/pricing" onNavigate={close}>Pricing</MobileNavLink>
+                        </SignedIn>
+                    </nav>
+
+                    <div className="flex flex-col gap-2 mt-auto pt-4 border-t">
+                        <SignedOut>
+                            <SignInButton mode="modal">
+                                <Button variant="outline" className="w-full">Log in</Button>
+                            </SignInButton>
+                            <SignUpButton mode="modal">
+                                <Button className="w-full">Sign up</Button>
+                            </SignUpButton>
+                        </SignedOut>
+                        <SignedIn>
+                            <Button asChild variant="outline" className="w-full gap-2 justify-center">
+                                <Link href="/pricing" onClick={close}>
+                                    <Crown className="w-4 h-4 text-amber-500" />
+                                    Upgrade to Pro
+                                </Link>
+                            </Button>
+                            <div className="flex items-center gap-3 pt-2">
+                                <UserButton afterSignOutUrl="/" />
+                                <span className="text-sm font-medium">Account</span>
+                            </div>
+                        </SignedIn>
+                    </div>
+                </div>
+            </SheetContent>
+        </Sheet>
     );
 }

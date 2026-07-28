@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/header";
 import { ClerkProvider } from '@clerk/nextjs'
 import { SubscriptionProvider } from "@/components/providers/subscription-provider";
 import { ConvexClientProvider } from "@/components/providers/convex-provider";
+import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
             <SubscriptionProvider>
               <Header />
               {children}
+              <Toaster />
             </SubscriptionProvider>
           </ConvexClientProvider>
         </body>

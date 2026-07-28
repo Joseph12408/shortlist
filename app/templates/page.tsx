@@ -5,40 +5,66 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { useRouter } from "next/navigation";
-import { Check, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { isTemplateFree } from "@/lib/tiers";
 
 export default function TemplatesPage() {
-    const { setTemplate, subscriptionStatus, resume } = useResumeStore();
-    const currentTheme = resume.customStyles?.theme || 'modern';
+    // NOTE: `subscriptionStatus` was read from the store but never defined there.
+    // Tier now comes from useFeatureAccess, and the premium flag is derived from
+    // lib/tiers so this page cannot disagree with the in-builder selector.
+    const { setTemplate } = useResumeStore();
     const router = useRouter();
+    const { isPro } = useFeatureAccess();
 
     const templates = [
+        {
+            id: 'standard',
+            name: 'Standard',
+            description: 'ATS-safe single column. The most reliably parsed layout.',
+            color: 'bg-stone-50',
+        },
         {
             id: 'classic',
             name: 'Classic',
             description: 'Traditional layout, perfect for corporate roles.',
             color: 'bg-slate-100',
-            premium: false
+        },
+        {
+            id: 'minimal',
+            name: 'Minimal',
+            description: 'Clean, centered, and whitespace forward.',
+            color: 'bg-white border',
         },
         {
             id: 'modern',
             name: 'Modern',
             description: 'Two-column design with a touch of color.',
             color: 'bg-indigo-50',
-            premium: true
         },
         {
-            id: 'minimal',
-            name: 'Minimal',
-            description: 'Clean, centered, and whitespace extraction.',
-            color: 'bg-white border',
-            premium: true
+            id: 'efficient',
+            name: 'Efficient',
+            description: 'Dense two-column layout that fits more on one page.',
+            color: 'bg-blue-50',
         },
-    ];
+        {
+            id: 'banner',
+            name: 'Executive Banner',
+            description: 'Bold header band for senior and client-facing roles.',
+            color: 'bg-slate-100',
+        },
+    ].map((t) => ({ ...t, premium: !isTemplateFree(t.id) }));
 
+    // Previously this ignored `premium` entirely, letting free users apply
+    // Pro templates straight from this page.
     const handleSelect = (id: string, premium: boolean) => {
-        setTemplate(id as 'classic' | 'modern' | 'minimal');
+        if (premium && !isPro) {
+            router.push("/pricing");
+            return;
+        }
+        setTemplate(id);
         router.push("/builder");
     };
 
@@ -59,9 +85,15 @@ export default function TemplatesPage() {
                             {/* Overlay on hover */}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <Button onClick={() => handleSelect(t.id, t.premium)}>
-                                    Use Template
+                                    {t.premium && !isPro ? 'Unlock with Pro' : 'Use Template'}
                                 </Button>
                             </div>
+
+                            {t.premium && !isPro && (
+                                <div className="absolute top-3 right-3 bg-background/90 rounded-full p-1.5 shadow-sm">
+                                    <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                                </div>
+                            )}
                         </div>
                         <CardHeader>
                             <div className="flex justify-between items-center">

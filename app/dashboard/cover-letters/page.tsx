@@ -2,9 +2,9 @@
 
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Edit2, FileText, ArrowLeft, LayoutDashboard, Files, FileType } from "lucide-react";
-import Link from "next/link";
+import { Plus, Trash2, Edit2, FileType } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DashboardHeader } from "@/components/layout/dashboard-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -30,38 +30,21 @@ export default function CoverLettersPage() {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-            {/* Header / Sub-nav */}
-            <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                <div className="container mx-auto px-6 py-8">
-                    <div className="flex items-center gap-2 mb-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-fit" onClick={() => router.push('/dashboard')}>
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm font-medium">Back to Home</span>
-                    </div>
-                    <h1 className="text-3xl font-bold font-heading text-slate-900 dark:text-white mb-2">
-                        Cover Letters
-                    </h1>
+            <DashboardHeader
+                title="Cover Letters"
+                description="Tailored cover letters saved to your account."
+                action={
+                    <Button onClick={handleCreate} className="w-full md:w-auto gap-2">
+                        <Plus className="w-4 h-4" />
+                        New Cover Letter
+                    </Button>
+                }
+            />
 
-                    <nav className="flex items-center gap-6 mt-8 border-b border-transparent">
-                        <Link href="/dashboard" className="pb-3 border-b-2 border-transparent hover:border-slate-300 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
-                            <LayoutDashboard className="w-4 h-4" />
-                            Dashboard
-                        </Link>
-                        <Link href="/dashboard/resumes" className="pb-3 border-b-2 border-transparent hover:border-slate-300 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
-                            <Files className="w-4 h-4" />
-                            My Resumes
-                        </Link>
-                        <Link href="/dashboard/cover-letters" className="pb-3 border-b-2 border-primary font-medium text-primary flex items-center gap-2">
-                            <FileType className="w-4 h-4" />
-                            Cover Letters
-                        </Link>
-                    </nav>
-                </div>
-            </div>
-
-            <main className="container mx-auto px-6 py-12">
+            <main className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
                 {(!savedCoverLetters || (savedCoverLetters?.length || 0) === 0) ? (
-                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                    <div className="text-center py-16 sm:py-20 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 px-4">
                         <div className="h-16 w-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
                             <FileType className="w-8 h-8 text-slate-400" />
                         </div>

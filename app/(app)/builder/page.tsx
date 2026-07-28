@@ -6,14 +6,15 @@ import { useResumeStore } from "@/lib/store/useResumeStore";
 import { useReactToPrint } from "react-to-print";
 import { generateDocx } from "@/lib/export/generate-docx";
 import { useResumePersistence } from "@/hooks/use-resume-persistence";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { toast } from "@/lib/toast";
 
 // Components
 import { ResumeForm } from "@/components/builder/resume-form";
 import { AIToolbar } from "@/components/builder/ai-toolbar";
 import { AILanding } from "@/components/builder/ai-landing";
-import { UpgradeModal } from "@/components/upgrade-modal";
+
 
 const ResumePreview = dynamic(
     () => import("@/components/builder/resume-preview").then(mod => mod.ResumePreview),
@@ -34,9 +35,10 @@ function BuilderContent() {
     } = useResumeStore();
 
     const searchParams = useSearchParams();
+    const router = useRouter();
     const { isPro } = useFeatureAccess();
     const [viewState, setViewState] = useState<'landing' | 'editor'>('landing');
-    const [showUpgrade, setShowUpgrade] = useState(false);
+
     const contentRef = useRef<HTMLDivElement>(null);
     const useReactToPrintFn = useReactToPrint({ contentRef });
 
@@ -66,7 +68,7 @@ function BuilderContent() {
             setViewMode('cover-letter');
             setViewState('editor');
         } else {
-            // Fresh visit with no params — reset for a clean landing page.
+            // Fresh visit with no params, reset for a clean landing page.
             resetBuilderSession();
             setViewState('landing');
         }
@@ -80,13 +82,16 @@ function BuilderContent() {
     // ─── HANDLERS ─────────────────────────────────────────────────
     const handleExportPdf = async () => {
         try {
-            if (!isPro) {
-                setShowUpgrade(true);
-                return;
-            }
-
             const store = useResumeStore.getState();
             const { viewMode, resume, coverLetter } = store;
+
+            // Cover letter export is Pro-only. Resume PDF is available on free
+            // with a watermark and a monthly cap. The server enforces both, so
+            // we let the request through and handle a 402 if the cap is hit.
+            if (viewMode === 'cover-letter' && !isPro) {
+                router.push('/pricing');
+                return;
+            }
 
             let endpoint = '/api/download-pdf';
             let bodyData: any = {};
@@ -106,12 +111,15 @@ function BuilderContent() {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                if (errorData.error === 'usage_limit_reached') {
-                    setShowUpgrade(true);
+                const errorData = await response.json().catch(() => ({}));
+                if (errorData.error === 'usage_limit_reached' || errorData.error === 'pro_required') {
+                    toast.error(errorData.message || 'You have reached your export limit for this month.');
+                    router.push('/pricing');
                     return;
                 }
-                throw new Error(errorData.error || 'Export failed');
+                // errorData.error is already a user-safe message from the API route.
+                toast.error(errorData.error || 'Something went wrong exporting your PDF. Please try again.');
+                return;
             }
 
             const blob = await response.blob();
@@ -129,24 +137,23 @@ function BuilderContent() {
             document.body.removeChild(a);
 
         } catch (error) {
+            // Full detail stays in the console for debugging. Users only see a
+            // plain, actionable message, never the raw exception.
             console.error('Export failed:', error);
-            alert(`Export Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            toast.error('Something went wrong exporting your PDF. Please try again.');
         }
     };
 
     const handleExportDocx = async () => {
         try {
             if (!isPro) {
-                setShowUpgrade(true);
+                router.push('/pricing');
                 return;
             }
             await generateDocx(resume);
-        } catch (e: any) {
-            if (e.message?.includes("limit reached")) {
-                setShowUpgrade(true);
-            } else {
-                alert("Export Failed: " + e.message);
-            }
+        } catch (error) {
+            console.error('DOCX export failed:', error);
+            toast.error('Something went wrong exporting your DOCX. Please try again.');
         }
     };
 
@@ -156,7 +163,7 @@ function BuilderContent() {
 
     const handleOptimize = () => {
         if (!isPro) {
-            setShowUpgrade(true);
+            router.push('/pricing');
             return;
         }
 
@@ -181,10 +188,10 @@ function BuilderContent() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-muted/20">
-            <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} />
+
 
             <AIToolbar
-                showPreview={isPreviewVisible}
+                showPreview={isPreviewVisible ?? false}
                 onTogglePreview={() => setPreviewVisible(!isPreviewVisible)}
                 onExportDocx={handleExportDocx}
                 onExportPdf={handleExportPdf}
@@ -192,17 +199,24 @@ function BuilderContent() {
                 isOptimizing={isLoading}
             />
 
-            <div className="flex flex-1 overflow-hidden">
-                <div className={`
-                    border-r bg-background overflow-y-auto custom-scrollbar transition-all duration-300
-                    ${isPreviewVisible ? 'w-1/2' : 'w-full max-w-5xl mx-auto border-r-0'}
-                `}>
+            {/* Below lg the panes stack and only one is shown at a time: two
+                side-by-side columns on a phone leave neither usable. The toolbar
+                toggle switches between editing and previewing. */}
+            <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
+                <div
+                    className={`
+                        bg-background overflow-y-auto custom-scrollbar transition-all duration-300
+                        ${isPreviewVisible
+                            ? 'hidden lg:block lg:w-1/2 lg:border-r'
+                            : 'block w-full lg:max-w-5xl lg:mx-auto'}
+                    `}
+                >
                     <ResumeForm />
                 </div>
 
                 {isPreviewVisible && (
-                    <div className="w-1/2 bg-muted/40 overflow-y-auto flex justify-center p-8">
-                        <div className="scale-[0.85] origin-top">
+                    <div className="flex-1 lg:w-1/2 bg-muted/40 overflow-y-auto overflow-x-hidden flex justify-center p-4 sm:p-6 lg:p-8">
+                        <div className="resume-preview-scaler">
                             <div ref={contentRef} className="shadow-2xl">
                                 <ResumePreview />
                             </div>
