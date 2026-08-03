@@ -51,3 +51,17 @@ export function currentPeriod(date: Date = new Date()): string {
 
 /** How many feedback items a free user sees in the analysis view. */
 export const FREE_VISIBLE_ISSUES = 3;
+
+/**
+ * Whop checkout plan IDs.
+ *
+ * Read from env so switching between Whop test and live plans, or changing
+ * price, is a dashboard change rather than a code deploy. The literals are the
+ * currently-live plans and act as a fallback so nothing breaks if the env vars
+ * are not set yet.
+ */
+export const WHOP_PLAN_MONTHLY =
+    process.env.NEXT_PUBLIC_WHOP_PLAN_MONTHLY || "plan_y608PYXGfix1q";
+
+export const WHOP_PLAN_YEARLY =
+    process.env.NEXT_PUBLIC_WHOP_PLAN_YEARLY || "plan_JEAL8xtw6h1Uo";

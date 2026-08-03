@@ -1,9 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateCoverLetterPDF } from '@/lib/resume-renderer/render-cover-letter';
-import arcjet_client from '@/lib/arcjet';
+import { getLimiter, COST } from '@/lib/arcjet';
 import { downloadCoverLetterSchema, safeParseBody } from '@/lib/validations';
 import { getEntitlement, PRO_REQUIRED_RESPONSE } from '@/lib/subscription-server';
+
+// Headless Chromium render, same as the resume export.
+export const maxDuration = 60;
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
     try {
@@ -19,7 +23,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Rate Limiting
-        const decision = await arcjet_client.protect(req, { userId, requested: 1 });
+        const decision = await getLimiter(isPro).protect(req, { userId, requested: COST.pdfExport });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }

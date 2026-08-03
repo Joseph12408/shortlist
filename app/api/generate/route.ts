@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
 import fs from 'fs';
 import path from 'path';
-import arcjet_client from '@/lib/arcjet';
+import { getLimiter, COST } from '@/lib/arcjet';
 import { generateResumeSchema, safeParseBody } from '@/lib/validations';
 import { getEntitlement, PRO_REQUIRED_RESPONSE } from '@/lib/subscription-server';
+
+// A full-resume Gemini call regularly runs past Vercel's 10s default.
+export const maxDuration = 60;
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
     try {
@@ -22,7 +26,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Rate Limiting Check
-        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
+        const decision = await getLimiter(isPro).protect(request, { userId, requested: COST.aiGenerate });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }

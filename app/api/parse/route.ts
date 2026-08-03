@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
-import { auth } from '@clerk/nextjs/server';
-import arcjet_client from '@/lib/arcjet';
+import { getLimiter, COST } from '@/lib/arcjet';
 import { parseResumeSchema, safeParseBody } from '@/lib/validations';
+import { getEntitlement } from '@/lib/subscription-server';
+
+// Gemini call over the uploaded document.
+export const maxDuration = 60;
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
     try {
-        const { userId } = await auth();
+        // Parsing an upload is a free feature; entitlement is read only to
+        // pick the right rate-limit bucket.
+        const { userId, isPro } = await getEntitlement();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
+        const decision = await getLimiter(isPro).protect(request, { userId, requested: COST.parse });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }

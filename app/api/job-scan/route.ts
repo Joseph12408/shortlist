@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import arcjet_client from '@/lib/arcjet';
+import { getLimiter, COST } from '@/lib/arcjet';
 import { safeParseBody } from '@/lib/validations';
 import { jobScanSchema } from '@/lib/validations';
 import { getEntitlement } from '@/lib/subscription-server';
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
+        const decision = await getLimiter(isPro).protect(request, { userId, requested: COST.jobScan });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }

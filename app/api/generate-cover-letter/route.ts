@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateContentWithFallback } from '@/lib/gemini';
-import arcjet_client from '@/lib/arcjet';
+import { getLimiter, COST } from '@/lib/arcjet';
 import { generateCoverLetterSchema, safeParseBody } from '@/lib/validations';
 import { getEntitlement, PRO_REQUIRED_RESPONSE } from '@/lib/subscription-server';
+
+// Gemini call, same latency profile as resume optimization.
+export const maxDuration = 60;
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
     try {
@@ -14,7 +18,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(PRO_REQUIRED_RESPONSE, { status: 402 });
         }
 
-        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
+        const decision = await getLimiter(isPro).protect(request, { userId, requested: COST.aiCoverLetter });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }

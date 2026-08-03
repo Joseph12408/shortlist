@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { WhopCheckoutEmbed } from '@whop/checkout/react';
 import { useUser } from '@clerk/nextjs';
+import { WHOP_PLAN_MONTHLY, WHOP_PLAN_YEARLY } from '@/lib/tiers';
 
 export function Pricing() {
     const { user } = useUser();
@@ -96,7 +97,7 @@ export function Pricing() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" variant="outline" onClick={() => setCheckoutPlan("plan_y608PYXGfix1q")}>
+                            <Button className="w-full" variant="outline" onClick={() => setCheckoutPlan(WHOP_PLAN_MONTHLY)}>
                                 Get Monthly
                             </Button>
                         </CardFooter>
@@ -136,7 +137,7 @@ export function Pricing() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" onClick={() => setCheckoutPlan("plan_JEAL8xtw6h1Uo")}>
+                            <Button className="w-full" onClick={() => setCheckoutPlan(WHOP_PLAN_YEARLY)}>
                                 Get Yearly
                             </Button>
                         </CardFooter>

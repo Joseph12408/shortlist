@@ -4,6 +4,10 @@ const isProtectedRoute = createRouteMatcher([
     '/dashboard(.*)',
     '/account(.*)',
     '/builder(.*)',
+    // Uploading here calls /api/parse, which requires auth. Without this a
+    // signed-out visitor could reach the page and only discover the problem
+    // after picking a file.
+    '/analysis(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

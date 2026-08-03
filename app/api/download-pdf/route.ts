@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePDF } from '@/lib/resume-renderer/render';
-import arcjet_client from '@/lib/arcjet';
+import { getLimiter, COST } from '@/lib/arcjet';
 import { safeParseBody } from '@/lib/validations';
 import { getEntitlement } from '@/lib/subscription-server';
 import { getServerConvexClient } from '@/lib/convex-server';
@@ -8,6 +8,11 @@ import { api } from '@/convex/_generated/api';
 import { FREE_MONTHLY_EXPORTS } from '@/lib/tiers';
 
 const GENERIC_EXPORT_ERROR = 'Something went wrong generating your PDF. Please try again.';
+
+// Launching headless Chromium costs several seconds before rendering even
+// starts, which blows through Vercel's 10s default.
+export const maxDuration = 60;
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
     try {
@@ -18,7 +23,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Rate Limiting
-        const decision = await arcjet_client.protect(request, { userId, requested: 1 });
+        const decision = await getLimiter(isPro).protect(request, { userId, requested: COST.pdfExport });
         if (decision.isDenied()) {
             return NextResponse.json({ error: 'Too Many Requests', reason: decision.reason }, { status: 429 });
         }
