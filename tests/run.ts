@@ -43,6 +43,8 @@ const FAST: Suite[] = [
     { name: 'Whop webhook signature verification', file: 'webhook-sig.test.ts' },
     { name: 'Free/Pro tier rules and ATS feedback', file: 'tiers.test.ts' },
     { name: 'PDF watermark injection (all templates)', file: 'watermark.test.ts' },
+    { name: 'Onboarding email rendering', file: 'email-render.test.ts' },
+    { name: 'Unsubscribe link signing', file: 'unsubscribe.test.ts' },
 ];
 
 const BROWSER: Suite[] = [

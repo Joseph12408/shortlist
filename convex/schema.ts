@@ -173,4 +173,23 @@ export default defineSchema({
         period: v.string(), // "YYYY-MM"
         exportCount: v.number(),
     }).index("by_user_period", ["userId", "period"]),
+
+    /**
+     * Email suppression list and onboarding-sequence bookkeeping.
+     *
+     * Keyed by email rather than userId because unsubscribe links are followed
+     * from an inbox, with no session, and because a person can unsubscribe
+     * before their Convex user row exists.
+     */
+    emailContacts: defineTable({
+        email: v.string(),
+        unsubscribed: v.boolean(),
+        unsubscribedAt: v.optional(v.number()),
+        /**
+         * Resend ids of the onboarding emails queued for future delivery, so
+         * they can be cancelled if this address unsubscribes. Emails already
+         * delivered are removed from this list.
+         */
+        pendingEmailIds: v.array(v.string()),
+    }).index('by_email', ['email']),
 });
