@@ -45,6 +45,7 @@ const FAST: Suite[] = [
     { name: 'PDF watermark injection (all templates)', file: 'watermark.test.ts' },
     { name: 'Onboarding email rendering', file: 'email-render.test.ts' },
     { name: 'Unsubscribe link signing', file: 'unsubscribe.test.ts' },
+    { name: 'Cross-platform file download', file: 'download.test.ts' },
 ];
 
 const BROWSER: Suite[] = [

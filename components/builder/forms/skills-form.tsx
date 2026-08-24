@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useResumeStore } from "@/lib/store/useResumeStore";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { RemoveEntryButton } from "./remove-entry-button";
 
 export function SkillsForm() {
     const { resume, addSkill, removeSkill, updateSkill } = useResumeStore();
@@ -23,15 +24,7 @@ export function SkillsForm() {
     return (
         <div className="space-y-6">
             {skills.map((skillGroup, index) => (
-                <div key={skillGroup.id} className="space-y-4 p-4 border rounded-lg bg-card/50 relative group">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => removeSkill(skillGroup.id)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                <div key={skillGroup.id} className="space-y-4 p-4 border rounded-lg bg-card/50">
 
                     <div className="grid gap-2">
                         <Label>Category</Label>
@@ -68,6 +61,7 @@ export function SkillsForm() {
                             ))}
                         </div>
                     </div>
+                    <RemoveEntryButton label="skill category" onRemove={() => removeSkill(skillGroup.id)} />
                 </div>
             ))}
 

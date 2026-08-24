@@ -82,12 +82,10 @@ export default function TemplatesPage() {
                             {/* Placeholder for template image - using text for now */}
                             <span className="text-2xl font-bold opacity-20 uppercase tracking-widest">{t.name}</span>
 
-                            {/* Overlay on hover */}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Button onClick={() => handleSelect(t.id, t.premium)}>
-                                    {t.premium && !isPro ? 'Unlock with Pro' : 'Use Template'}
-                                </Button>
-                            </div>
+                            {/* Dim on hover as an affordance, but never gate the
+                                control behind it: touch devices have no hover, so a
+                                hover-revealed button is unreachable on mobile. */}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
 
                             {t.premium && !isPro && (
                                 <div className="absolute top-3 right-3 bg-background/90 rounded-full p-1.5 shadow-sm">
@@ -105,8 +103,15 @@ export default function TemplatesPage() {
                                 )}
                             </div>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-4">
                             <p className="text-sm text-muted-foreground">{t.description}</p>
+                            <Button
+                                onClick={() => handleSelect(t.id, t.premium)}
+                                variant={t.premium && !isPro ? "outline" : "default"}
+                                className="w-full min-h-11"
+                            >
+                                {t.premium && !isPro ? "Unlock with Pro" : "Use Template"}
+                            </Button>
                         </CardContent>
                     </Card>
                 ))}

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { useReactToPrint } from "react-to-print";
 import { generateDocx } from "@/lib/export/generate-docx";
+import { downloadBlob } from "@/lib/export/download";
 import { useResumePersistence } from "@/hooks/use-resume-persistence";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
@@ -123,18 +124,18 @@ function BuilderContent() {
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
             const baseName = viewMode === 'cover-letter'
                 ? (coverLetter?.jobTitle || 'cover-letter')
                 : (resume?.profile?.fullName || 'resume');
             const fileName = `${baseName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+
+            const result = downloadBlob(blob, fileName);
+
+            if (result.blocked) {
+                toast.error('Your browser blocked the download. Allow pop-ups for this site and try again.');
+            } else if (result.openedInNewTab) {
+                toast.info('Your PDF opened in a new tab. Use the share button to save it.');
+            }
 
         } catch (error) {
             // Full detail stays in the console for debugging. Users only see a
@@ -150,7 +151,13 @@ function BuilderContent() {
                 router.push('/pricing');
                 return;
             }
-            await generateDocx(resume);
+            const result = await generateDocx(resume);
+
+            if (result?.blocked) {
+                toast.error('Your browser blocked the download. Allow pop-ups for this site and try again.');
+            } else if (result?.openedInNewTab) {
+                toast.info('Your DOCX opened in a new tab. Use the share button to save it.');
+            }
         } catch (error) {
             console.error('DOCX export failed:', error);
             toast.error('Something went wrong exporting your DOCX. Please try again.');

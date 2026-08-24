@@ -1,5 +1,5 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } from "docx";
-import { saveAs } from "file-saver";
+import { downloadBlob } from "./download";
 import { Resume } from "@/types/resume";
 
 export const generateDocx = async (resume: Resume) => {
@@ -134,5 +134,7 @@ export const generateDocx = async (resume: Resume) => {
 
     const blob = await Packer.toBlob(doc);
     const baseName = profile.fullName || 'resume';
-    saveAs(blob, `${baseName.replace(/\s+/g, '-').toLowerCase()}.docx`);
+    // Shared helper rather than file-saver: it handles the iOS case, where the
+    // `download` attribute is ignored for blob URLs.
+    return downloadBlob(blob, `${baseName.replace(/\s+/g, '-').toLowerCase()}.docx`);
 };

@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useResumeStore } from "@/lib/store/useResumeStore";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { RemoveEntryButton } from "./remove-entry-button";
 
 export function LeadershipForm() {
     const { resume, addLeadership, removeLeadership, updateLeadership } = useResumeStore();
@@ -14,15 +15,7 @@ export function LeadershipForm() {
     return (
         <div className="space-y-6">
             {leadership.map((item, index) => (
-                <div key={item.id} className="space-y-4 p-4 border rounded-lg bg-card/50 relative group">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => removeLeadership(item.id)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                <div key={item.id} className="space-y-4 p-4 border rounded-lg bg-card/50">
 
                     <div className="grid gap-2">
                         <Label>Organization</Label>
@@ -80,6 +73,7 @@ export function LeadershipForm() {
                         />
                         <p className="text-xs text-muted-foreground">Tip: Highlight your initiative and impact.</p>
                     </div>
+                    <RemoveEntryButton label="leadership role" onRemove={() => removeLeadership(item.id)} />
                 </div>
             ))}
 

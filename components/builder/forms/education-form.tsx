@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useResumeStore } from "@/lib/store/useResumeStore";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { RemoveEntryButton } from "./remove-entry-button";
 
 export function EducationForm() {
     const { resume, addEducation, removeEducation, updateEducation } = useResumeStore();
@@ -13,15 +14,7 @@ export function EducationForm() {
     return (
         <div className="space-y-6">
             {education.map((edu, index) => (
-                <div key={edu.id} className="space-y-4 p-4 border rounded-lg bg-card/50 relative group">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => removeEducation(edu.id)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                <div key={edu.id} className="space-y-4 p-4 border rounded-lg bg-card/50">
 
                     <div className="grid gap-2">
                         <Label>School / University</Label>
@@ -69,6 +62,7 @@ export function EducationForm() {
                             />
                         </div>
                     </div>
+                    <RemoveEntryButton label="education entry" onRemove={() => removeEducation(edu.id)} />
                 </div>
             ))}
 
