@@ -1,7 +1,11 @@
 import { withSentryConfig } from '@sentry/nextjs';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['puppeteer'],
+  // @sparticuz/chromium ships brotli-compressed Chromium binaries in its bin/
+  // directory. Bundling it strips those, so at runtime the serverless function
+  // fails with "The input directory .../@sparticuz/chromium/bin does not exist".
+  // Marking these external keeps them in node_modules where the loader expects.
+  serverExternalPackages: ['puppeteer', 'puppeteer-core', '@sparticuz/chromium'],
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if
