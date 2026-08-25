@@ -46,6 +46,7 @@ const FAST: Suite[] = [
     { name: 'Onboarding email rendering', file: 'email-render.test.ts' },
     { name: 'Unsubscribe link signing', file: 'unsubscribe.test.ts' },
     { name: 'Cross-platform file download', file: 'download.test.ts' },
+    { name: 'Resume list naming and blanks', file: 'resume-list.test.ts' },
 ];
 
 const BROWSER: Suite[] = [

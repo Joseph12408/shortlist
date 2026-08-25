@@ -4,12 +4,13 @@ import { useResumeStore } from "@/lib/store/useResumeStore";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Edit2, FileType } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { EditableTitle } from "@/components/dashboard/editable-title";
 import { DashboardHeader } from "@/components/layout/dashboard-nav";
 
 export const dynamic = "force-dynamic";
 
 export default function CoverLettersPage() {
-    const { savedCoverLetters, loadCoverLetter, deleteCoverLetter, createNewCoverLetter } = useResumeStore();
+    const { savedCoverLetters, loadCoverLetter, deleteCoverLetter, createNewCoverLetter, renameCoverLetter } = useResumeStore();
     const router = useRouter();
 
     const handleEdit = (id: string) => {
@@ -68,16 +69,19 @@ export default function CoverLettersPage() {
                             <span className="font-semibold text-slate-600 dark:text-slate-300">Create New Cover Letter</span>
                         </div>
 
-                        {/* CL Cards */}
-                        {(savedCoverLetters || []).map((cl) => (
+                        {/* CL Cards. Reversed so the newest sits immediately after
+                            "Create New Cover Letter" rather than at the very end. */}
+                        {[...(savedCoverLetters || [])].reverse().map((cl) => (
                             <div key={cl.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-md transition-all flex flex-col h-64">
                                 <div className="h-32 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-900 border-b p-6 relative group">
                                     <FileType className="w-12 h-12 text-purple-300 absolute bottom-4 right-4 group-hover:scale-110 transition-transform" />
                                 </div>
                                 <div className="p-6 flex-1 flex flex-col">
-                                    <h3 className="font-bold text-lg truncate mb-1">
-                                        {cl.title || (cl.jobTitle ? `Application for ${cl.jobTitle}` : "Untitled Cover Letter")}
-                                    </h3>
+                                    <EditableTitle
+                                        value={cl.title || (cl.jobTitle ? `Application for ${cl.jobTitle}` : "Untitled Cover Letter")}
+                                        placeholder="Untitled Cover Letter"
+                                        onSave={(next) => renameCoverLetter(cl.id, next)}
+                                    />
                                     <p className="text-xs text-muted-foreground mb-4">
                                         {cl.company || "No company specified"}
                                     </p>

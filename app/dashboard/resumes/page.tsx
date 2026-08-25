@@ -4,10 +4,11 @@ import { useResumeStore } from "@/lib/store/useResumeStore";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Edit2, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { EditableTitle } from "@/components/dashboard/editable-title";
 import { DashboardHeader } from "@/components/layout/dashboard-nav";
 
 export default function ResumesPage() {
-    const { savedResumes, loadResume, deleteResume, createNewResume } = useResumeStore();
+    const { savedResumes, loadResume, deleteResume, createNewResume, renameResume } = useResumeStore();
     const router = useRouter();
 
     const handleEdit = (id: string) => {
@@ -67,16 +68,19 @@ export default function ResumesPage() {
                             <span className="font-semibold text-slate-600 dark:text-slate-300">Create New Resume</span>
                         </div>
 
-                        {/* Resume Cards */}
-                        {(savedResumes || []).map((resume, index) => (
+                        {/* Resume Cards. Reversed so the newest sits immediately
+                            after "Create New Resume" rather than at the very end. */}
+                        {[...(savedResumes || [])].reverse().map((resume, index) => (
                             <div key={`${resume.id}-${index}`} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-md transition-all flex flex-col h-64">
                                 <div className="h-32 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 border-b p-6 relative group">
                                     <FileText className="w-12 h-12 text-slate-300 absolute bottom-4 right-4 group-hover:scale-110 transition-transform" />
                                 </div>
                                 <div className="p-6 flex-1 flex flex-col">
-                                    <h3 className="font-bold text-lg truncate mb-1">
-                                        {resume.title || resume.profile.fullName || "Untitled Resume"}
-                                    </h3>
+                                    <EditableTitle
+                                        value={resume.title || resume.profile.fullName || "Untitled Resume"}
+                                        placeholder="Untitled Resume"
+                                        onSave={(next) => renameResume(resume.id, next)}
+                                    />
                                     <p className="text-xs text-muted-foreground mb-4">
                                         {resume.experience?.[0]?.title || "No Role"} • {resume.experience?.[0]?.company || "No Company"}
                                     </p>

@@ -7,6 +7,7 @@ import { THEME_PRESETS } from '../themes';
 import { convex } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
 import { toast } from '@/lib/toast';
+import { isResumeEmpty, deriveResumeTitle, isPlaceholderTitle, isCoverLetterEmpty, deriveCoverLetterTitle } from '@/lib/resume-utils';
 
 export interface ResumeState {
     savedResumes: Resume[];
@@ -36,6 +37,10 @@ export interface ResumeState {
     setResumeTitle: (title: string) => void;
     loadResume: (id: string) => void;
     createNewResume: () => void;
+    /** Rename a saved resume by id, from the dashboard list. */
+    renameResume: (id: string, title: string) => Promise<void>;
+    /** Rename a saved cover letter by id, from the dashboard list. */
+    renameCoverLetter: (id: string, title: string) => Promise<void>;
     deleteResume: (id: string) => Promise<void>;
     
     // Cover Letter actions
@@ -93,6 +98,7 @@ function isDraftId(id: string | undefined | null): boolean {
     return id === 'draft' || (id.length === 36 && id.includes('-'));
 }
 
+
 const initialResume: Resume = {
     id: 'draft',
     title: 'Untitled Resume',
@@ -145,6 +151,23 @@ export const useResumeStore = create<ResumeState>()(
             initialize: async () => {
                 set({ isLoading: true });
 
+                // Drop blank records left behind by the old create-then-save
+                // behaviour. They contain nothing the user entered, so this is
+                // safe, and it clears the stray "Resume #1" already in storage.
+                {
+                    const { savedResumes, savedCoverLetters } = get();
+                    const prunedResumes = (savedResumes || []).filter(r => !isResumeEmpty(r));
+                    const prunedLetters = (savedCoverLetters || []).filter(
+                        (cl: any) => cl?.body?.trim() || cl?.jobTitle?.trim() || cl?.company?.trim()
+                    );
+                    if (prunedResumes.length !== (savedResumes || []).length) {
+                        set({ savedResumes: prunedResumes });
+                    }
+                    if (prunedLetters.length !== (savedCoverLetters || []).length) {
+                        set({ savedCoverLetters: prunedLetters });
+                    }
+                }
+
                 try {
                     const [resumes, coverLetters] = await Promise.all([
                         convex.query(api.resumes.list, {}),
@@ -195,7 +218,19 @@ export const useResumeStore = create<ResumeState>()(
 
             saveCurrentResume: async () => {
                 const { resume, savedResumes, atsScore } = get();
-                const resumeWithScore = { ...resume, atsScore };
+
+                // Never persist a blank record. Creating a resume and walking away
+                // used to leave an empty entry in the list permanently.
+                if (isResumeEmpty(resume)) return;
+
+                // Keep the name in step with the content while the user has not
+                // set one explicitly. Once they rename it, leave it alone.
+                const title = isPlaceholderTitle(resume.title)
+                    ? deriveResumeTitle(resume)
+                    : resume.title;
+
+                const resumeWithScore = { ...resume, title, atsScore };
+                if (title !== resume.title) set({ resume: { ...resume, title } });
 
                 const index = savedResumes.findIndex(r => r.id === (resume.id || ''));
                 let newSaved;
@@ -295,16 +330,58 @@ export const useResumeStore = create<ResumeState>()(
             },
 
             createNewResume: () => {
-                const { savedResumes } = get();
-                const count = (savedResumes || []).length + 1;
                 const newResume = {
                     ...initialResume,
                     id: uuidv4(), // Draft ID
-                    title: `Resume #${count}`
+                    title: 'Untitled Resume',
                 };
                 set({ resume: newResume });
-                // Save immediately to creation in Convex
-                get().saveCurrentResume();
+                // Deliberately not saved here. The persistence hook writes it once
+                // the user actually enters something, so abandoning the builder no
+                // longer leaves a blank entry behind.
+            },
+
+            renameResume: async (id, title) => {
+                const next = title.trim();
+                if (!next) return;
+
+                set((state) => ({
+                    savedResumes: (state.savedResumes || []).map(r =>
+                        r.id === id ? { ...r, title: next } : r
+                    ),
+                    // Keep the open resume in step if it is the one renamed.
+                    resume: state.resume?.id === id ? { ...state.resume, title: next } : state.resume,
+                }));
+
+                try {
+                    if (!isDraftId(id)) {
+                        await convex.mutation(api.resumes.update, { id: id as any, title: next } as any);
+                    }
+                } catch (err) {
+                    console.error('Failed to rename resume in Convex', err);
+                }
+            },
+
+            renameCoverLetter: async (id, title) => {
+                const next = title.trim();
+                if (!next) return;
+
+                set((state) => ({
+                    savedCoverLetters: (state.savedCoverLetters || []).map((cl: any) =>
+                        cl.id === id ? { ...cl, title: next } : cl
+                    ),
+                    coverLetter: state.coverLetter?.id === id
+                        ? { ...state.coverLetter, title: next }
+                        : state.coverLetter,
+                }));
+
+                try {
+                    if (!isDraftId(id)) {
+                        await convex.mutation(api.coverLetters.update, { id: id as any, title: next });
+                    }
+                } catch (err) {
+                    console.error('Failed to rename cover letter in Convex', err);
+                }
             },
 
             deleteResume: async (id) => {
@@ -330,38 +407,19 @@ export const useResumeStore = create<ResumeState>()(
             },
 
             createNewCoverLetter: async () => {
-                const { savedCoverLetters } = get();
-                const count = (savedCoverLetters || []).length + 1;
-                const newCL = {
-                    id: uuidv4(), // Draft id until Convex assigns a real one
-                    title: `Cover Letter #${count}`,
-                    jobTitle: '',
-                    company: '',
-                    recipient: '',
-                    body: '',
-                };
-                set({ coverLetter: newCL, savedCoverLetters: [...(savedCoverLetters || []), newCL] });
-
-                try {
-                    const newId = await convex.mutation(api.coverLetters.create, {
-                        title: newCL.title,
+                // Same fix as resumes: hold the draft in session only. It is
+                // persisted by saveCurrentCoverLetter once it has real content,
+                // so abandoning the editor leaves no blank entry in the list.
+                set({
+                    coverLetter: {
+                        id: uuidv4(), // Draft id until Convex assigns a real one
+                        title: 'Untitled Cover Letter',
                         jobTitle: '',
                         company: '',
                         recipient: '',
                         body: '',
-                    });
-
-                    const persisted = { ...newCL, id: newId as unknown as string };
-                    set((state) => ({
-                        coverLetter: persisted,
-                        savedCoverLetters: (state.savedCoverLetters || []).map((cl: any) =>
-                            cl.id === newCL.id ? persisted : cl
-                        ),
-                    }));
-                } catch (err) {
-                    // Keep the local draft. saveCurrentCoverLetter will retry the sync.
-                    console.warn('Cover letter not synced to Convex yet:', err);
-                }
+                    },
+                });
             },
 
             deleteCoverLetter: async (id: string) => {
@@ -384,6 +442,23 @@ export const useResumeStore = create<ResumeState>()(
             saveCurrentCoverLetter: async () => {
                 const { coverLetter, savedCoverLetters } = get();
                 if (!coverLetter) return;
+
+                // Nothing worth keeping yet, so do not create a blank entry.
+                const hasContent = Boolean(
+                    coverLetter.body?.trim() ||
+                    coverLetter.jobTitle?.trim() ||
+                    coverLetter.company?.trim()
+                );
+                if (!hasContent) return;
+
+                // Name it from the job it targets while the title is still a
+                // placeholder, so the list is not a column of "Untitled".
+                if (isPlaceholderTitle(coverLetter.title)) {
+                    const derived = coverLetter.company?.trim() && coverLetter.jobTitle?.trim()
+                        ? `${coverLetter.jobTitle.trim()} at ${coverLetter.company.trim()}`
+                        : coverLetter.jobTitle?.trim() || coverLetter.company?.trim();
+                    if (derived) coverLetter.title = derived;
+                }
 
                 // Mirror into the local list so the dashboard updates immediately.
                 const index = (savedCoverLetters || []).findIndex((cl: any) => cl.id === coverLetter.id);
