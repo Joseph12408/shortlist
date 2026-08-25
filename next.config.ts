@@ -6,6 +6,15 @@ const nextConfig = {
   // fails with "The input directory .../@sparticuz/chromium/bin does not exist".
   // Marking these external keeps them in node_modules where the loader expects.
   serverExternalPackages: ['puppeteer', 'puppeteer-core', '@sparticuz/chromium'],
+
+  // Marking the package external is not enough on its own. The Chromium
+  // binaries live in bin/*.br and are opened by path at runtime, so nothing
+  // statically references them and file tracing leaves them out: the lambda
+  // ships the loader with no browser to decompress. Force them in.
+  outputFileTracingIncludes: {
+    '/api/download-pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
+    '/api/download-cover-letter': ['./node_modules/@sparticuz/chromium/bin/**'],
+  },
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if
