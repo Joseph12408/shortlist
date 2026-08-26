@@ -98,6 +98,36 @@ function isDraftId(id: string | undefined | null): boolean {
     return id === 'draft' || (id.length === 36 && id.includes('-'));
 }
 
+/**
+ * Surface a failed Convex write to the user.
+ *
+ * Every one of these used to be swallowed into console.error, so when the
+ * backend rejected writes the app looked like it was working and quietly kept
+ * everything in localStorage. That hid a total persistence outage for a long
+ * time. Warn once per session: enough to be noticed, not enough to spam on a
+ * debounced autosave loop.
+ */
+let hasWarnedSyncFailure = false;
+
+function reportSyncFailure(context: string, err: unknown) {
+    console.error(`[SYNC] ${context}`, err);
+
+    const message = String(err);
+    // Not yet authenticated is a normal transient on first paint.
+    if (message.includes('Unauthenticated') || message.includes('Not authenticated')) {
+        if (!hasWarnedSyncFailure) {
+            hasWarnedSyncFailure = true;
+            toast.error("You're signed out, so changes are only saved on this device. Try signing in again.");
+        }
+        return;
+    }
+
+    if (!hasWarnedSyncFailure) {
+        hasWarnedSyncFailure = true;
+        toast.error("Couldn't save to your account. Your work is kept on this device for now.");
+    }
+}
+
 
 const initialResume: Resume = {
     id: 'draft',
@@ -279,15 +309,11 @@ export const useResumeStore = create<ResumeState>()(
                     }
 
                 } catch (err: any) {
-                    // Silently handle auth failures. The Convex client may not have
-                    // the Clerk JWT yet if the user just signed in. Local persistence
-                    // still works via Zustand's persist middleware.
-                    const errorString = String(err);
-                    if (errorString.includes('Unauthenticated') || errorString.includes('Not authenticated')) {
-                        console.warn("Convex sync skipped (not authenticated yet). Data saved locally.");
-                    } else {
-                        console.error("Failed to sync to Convex", err);
-                    }
+                    // This used to swallow auth failures entirely on the theory
+                    // that the Clerk JWT might not have arrived yet. In practice
+                    // it hid a permanent outage: every save fell back to
+                    // localStorage and the app looked healthy for weeks.
+                    reportSyncFailure('save resume', err);
                 }
             },
 
@@ -358,7 +384,7 @@ export const useResumeStore = create<ResumeState>()(
                         await convex.mutation(api.resumes.update, { id: id as any, title: next } as any);
                     }
                 } catch (err) {
-                    console.error('Failed to rename resume in Convex', err);
+                    reportSyncFailure('rename resume', err);
                 }
             },
 
@@ -380,7 +406,7 @@ export const useResumeStore = create<ResumeState>()(
                         await convex.mutation(api.coverLetters.update, { id: id as any, title: next });
                     }
                 } catch (err) {
-                    console.error('Failed to rename cover letter in Convex', err);
+                    reportSyncFailure('rename cover letter', err);
                 }
             },
 
@@ -435,7 +461,7 @@ export const useResumeStore = create<ResumeState>()(
                         await convex.mutation(api.coverLetters.remove, { id: id as any });
                     }
                 } catch (err) {
-                    console.error('Failed to delete cover letter from Convex', err);
+                    reportSyncFailure('delete cover letter', err);
                 }
             },
 
@@ -496,7 +522,7 @@ export const useResumeStore = create<ResumeState>()(
                     if (errorString.includes('Unauthenticated') || errorString.includes('Not authenticated')) {
                         console.warn('Cover letter sync skipped (not authenticated yet). Saved locally.');
                     } else {
-                        console.error('Failed to sync cover letter to Convex', err);
+                        reportSyncFailure('save cover letter', err);
                     }
                 }
             },
@@ -771,7 +797,7 @@ export const useResumeStore = create<ResumeState>()(
                     });
                 } catch (err) {
                     // History is a convenience, never block the analysis on it.
-                    console.error('Failed to save analysis to history', err);
+                    reportSyncFailure('save analysis to history', err);
                 }
             },
 
@@ -816,7 +842,7 @@ export const useResumeStore = create<ResumeState>()(
                         });
                     }
                 } catch (err) {
-                    console.error('Failed to record job scan', err);
+                    reportSyncFailure('record job scan', err);
                 }
             },
             improveResumeWithAI: async () => {
