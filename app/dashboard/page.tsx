@@ -22,12 +22,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { DashboardHeader } from "@/components/layout/dashboard-nav";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { analyzeResume } from "@/lib/ats/ats-score";
 
 export default function DashboardPage() {
   const { resume, savedResumes, savedCoverLetters, createNewResume } = useResumeStore();
@@ -50,17 +51,50 @@ export default function DashboardPage() {
     router.push(`/builder?mode=edit&resumeId=${id}`);
   };
 
-  // Average across real saved reviews. Shows 0 rather than an invented score
-  // when there is nothing to average, so the number is always trustworthy.
   const reviewList = analyses ?? [];
+  const resumeList = savedResumes || [];
+
+  // The grading breakdown reads from a saved review when there is one, because
+  // that is the exact snapshot the user saw. When there is not, it is scored
+  // live from the most recent resume instead of sitting at 0.
+  //
+  // These bars used to depend entirely on the `analyses` table, which is only
+  // written when someone completes a run on the Analysis page. Anyone who built
+  // a resume and went to the dashboard saw four empty bars and no way to tell
+  // whether that meant "scored zero" or "never measured". Nothing here is
+  // invented: analyzeResume is the same scorer the Analysis page uses.
+  const latestReview: any = reviewList[0];
+  const gradedResume = resumeList[0];
+
+  const liveScores = useMemo(
+    () => (!latestReview && gradedResume ? analyzeResume(gradedResume, "") : null),
+    [latestReview, gradedResume]
+  );
+
+  const gradingCategories: { name: string; score: number; maxScore: number }[] =
+    latestReview?.categoryScores
+      ?? (liveScores ? Object.values(liveScores.categoryScores) : []);
+
+  // What the bars are measuring, so the panel is never ambiguous.
+  const gradingSource = latestReview
+    ? `Based on your review of ${latestReview.resumeTitle}.`
+    : gradedResume
+      ? `Live score for ${gradedResume.title || "your most recent resume"}.`
+      : "Add a resume to see how it scores.";
+
+  // Average the real reviews when they exist, otherwise the scores already
+  // stored against saved resumes. Still 0 when there is genuinely nothing.
+  const scoredResumes = resumeList.filter((r: any) => typeof r.atsScore === "number");
   const avgScore = reviewList.length > 0
     ? Math.round(reviewList.reduce((acc: number, a: any) => acc + a.overallScore, 0) / reviewList.length)
-    : 0;
+    : liveScores
+      ? liveScores.overallScore
+      : scoredResumes.length > 0
+        ? Math.round(scoredResumes.reduce((acc: number, r: any) => acc + r.atsScore, 0) / scoredResumes.length)
+        : 0;
 
-  // Grading breakdown from the most recent review.
-  const latest: any = reviewList[0];
   const categoryPct = (name: string) => {
-    const cat = latest?.categoryScores?.find((c: any) =>
+    const cat = gradingCategories.find((c: any) =>
       c.name.toLowerCase().startsWith(name.toLowerCase())
     );
     if (!cat || !cat.maxScore) return 0;
@@ -179,7 +213,7 @@ export default function DashboardPage() {
                   <Sparkles className="w-5 h-5 text-blue-500" />
                   AI Grading System
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Detailed performance breakdown based on current standards.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{gradingSource}</p>
               </div>
               <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600">
                 <MoreHorizontal className="w-5 h-5" />

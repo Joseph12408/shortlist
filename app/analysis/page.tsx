@@ -125,7 +125,10 @@ export default function AnalysisPage() {
     // re-runs on every resume mutation.
     useEffect(() => {
         if (!isAnalyzed || hasRecorded) return;
-        if (!atsScore || !categoryScores || Object.keys(categoryScores).length === 0) return;
+        // Note: check against undefined rather than falsiness. A resume that
+        // genuinely scores 0 is exactly the one worth recording, and `!atsScore`
+        // silently skipped it.
+        if (atsScore === undefined || !categoryScores || Object.keys(categoryScores).length === 0) return;
 
         setHasRecorded(true);
         recordAnalysis(resume.title || fileName || "Untitled Resume");

@@ -4,14 +4,13 @@ import { useEffect, useRef } from "react";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 
 export function useResumePersistence() {
-    const { resume, initialLoadDone, initialize, saveCurrentResume } = useResumeStore();
+    const { resume, initialLoadDone, saveCurrentResume } = useResumeStore();
     const isFirstRender = useRef(true);
     const timeoutRef = useRef<NodeJS.Timeout>(null);
 
-    // Initial load
-    useEffect(() => {
-        initialize();
-    }, [initialize]);
+    // Hydration is no longer done here. StoreSyncProvider loads from Convex
+    // once for the whole app as soon as Clerk issues a token, so the builder is
+    // not the only screen that ever sees the account's real data.
 
     // Auto-save
     useEffect(() => {

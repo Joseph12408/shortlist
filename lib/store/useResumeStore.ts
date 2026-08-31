@@ -7,7 +7,7 @@ import { THEME_PRESETS } from '../themes';
 import { convex } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
 import { toast } from '@/lib/toast';
-import { isResumeEmpty, deriveResumeTitle, isPlaceholderTitle, isCoverLetterEmpty, deriveCoverLetterTitle } from '@/lib/resume-utils';
+import { isResumeEmpty, deriveResumeTitle, isPlaceholderTitle, isCoverLetterEmpty, deriveCoverLetterTitle, toResumePayload, toCoverLetterPayload } from '@/lib/resume-utils';
 
 export interface ResumeState {
     savedResumes: Resume[];
@@ -16,6 +16,8 @@ export interface ResumeState {
     coverLetter: any;
     isLoading: boolean;
     initialLoadDone: boolean;
+    /** True while initialize() is in flight, so concurrent callers no-op. */
+    isSyncing: boolean;
     jobDescription?: string;
     atsScore?: number;
     categoryScores?: Record<string, any>;
@@ -31,6 +33,10 @@ export interface ResumeState {
 
     // Actions
     initialize: () => Promise<void>;
+    /** Uploads records that exist only in this browser. Returns how many. */
+    migrateLocalOnly: () => Promise<number>;
+    /** Clears the localStorage mirror, called on sign-out. */
+    clearLocalData: () => void;
     saveCurrentResume: () => Promise<void>;
     resetBuilderSession: () => void;
     setResume: (resume: Resume) => void;
@@ -177,9 +183,26 @@ export const useResumeStore = create<ResumeState>()(
             scanUsage: { used: 0, limit: null, blocked: false },
             isLoading: true,
             initialLoadDone: false,
+            isSyncing: false,
 
+            /**
+             * Pull the account's real data down from Convex, and push up
+             * anything that only ever reached this browser.
+             *
+             * This used to run from the builder page alone, which meant the
+             * dashboard, My Resumes and Cover Letters pages never queried the
+             * backend at all: they rendered whatever localStorage held. Signing
+             * in on a second device therefore showed an empty account even
+             * though the rows existed on the server. It now runs once per
+             * session from StoreSyncProvider, as soon as Clerk has issued a
+             * token.
+             */
             initialize: async () => {
-                set({ isLoading: true });
+                // The provider fires this on auth and the builder's persistence
+                // hook fires it again on mount. Without a guard the two races
+                // duplicate every migrated resume.
+                if (get().isSyncing) return;
+                set({ isSyncing: true, isLoading: true });
 
                 // Drop blank records left behind by the old create-then-save
                 // behaviour. They contain nothing the user entered, so this is
@@ -187,9 +210,7 @@ export const useResumeStore = create<ResumeState>()(
                 {
                     const { savedResumes, savedCoverLetters } = get();
                     const prunedResumes = (savedResumes || []).filter(r => !isResumeEmpty(r));
-                    const prunedLetters = (savedCoverLetters || []).filter(
-                        (cl: any) => cl?.body?.trim() || cl?.jobTitle?.trim() || cl?.company?.trim()
-                    );
+                    const prunedLetters = (savedCoverLetters || []).filter((cl: any) => !isCoverLetterEmpty(cl));
                     if (prunedResumes.length !== (savedResumes || []).length) {
                         set({ savedResumes: prunedResumes });
                     }
@@ -199,53 +220,156 @@ export const useResumeStore = create<ResumeState>()(
                 }
 
                 try {
-                    const [resumes, coverLetters] = await Promise.all([
+                    let [remoteResumes, remoteLetters] = await Promise.all([
                         convex.query(api.resumes.list, {}),
-                        convex.query(api.coverLetters.list, {}).catch(() => null),
+                        convex.query(api.coverLetters.list, {}),
                     ]);
 
-                    // Convex is the source of truth for cover letters; fall back to
-                    // whatever was persisted locally if the query failed.
-                    if (coverLetters) {
-                        set({
-                            savedCoverLetters: coverLetters.map((cl: any) => ({
-                                ...cl,
-                                id: cl._id,
-                            })),
-                        });
+                    // Anything still carrying a draft id exists only in this
+                    // browser: it was written while the backend was
+                    // unreachable. Push it up before adopting the server's
+                    // list, or switching devices loses it for good.
+                    const migrated = await get().migrateLocalOnly();
+                    if (migrated > 0) {
+                        [remoteResumes, remoteLetters] = await Promise.all([
+                            convex.query(api.resumes.list, {}),
+                            convex.query(api.coverLetters.list, {}),
+                        ]);
                     }
+
+                    // Convex returns `_id`; the rest of the app keys off `id`.
+                    // Skipping this mapping left every loaded resume with an
+                    // undefined id, so editing one opened a blank builder and
+                    // the next save inserted a duplicate instead of patching.
+                    const loadedResumes = (remoteResumes || []).map((r: any) => ({
+                        ...r,
+                        id: r._id,
+                    })) as unknown as Resume[];
+
+                    const loadedLetters = (remoteLetters || []).map((cl: any) => ({
+                        ...cl,
+                        id: cl._id,
+                    }));
+
+                    // The account is the source of truth once it has answered.
+                    set({
+                        savedResumes: loadedResumes,
+                        savedCoverLetters: loadedLetters,
+                    });
 
                     get().refreshScanUsage();
 
-                    if (resumes && resumes.length > 0) {
-                        const loadedResumes = resumes as unknown as Resume[];
-                        const currentResume = get().resume;
-                        
-                        const hasActiveData = Boolean(
-                            currentResume.profile?.fullName ||
-                            (currentResume.experience && currentResume.experience.length > 0) ||
-                            (currentResume.education && currentResume.education.length > 0) ||
-                            (currentResume.skills && currentResume.skills.length > 0)
-                        );
-
-                        set({
-                            savedResumes: loadedResumes,
-                            resume: hasActiveData ? currentResume : loadedResumes[0], 
-                            initialLoadDone: true,
-                            isLoading: false
-                        });
-
-                        get().runATSAnalysis();
-                    } else {
-                        set({ initialLoadDone: true, isLoading: false });
+                    // Keep whatever the user is actively editing. Otherwise open
+                    // the most recent saved resume so a new device lands on real
+                    // content rather than an empty form.
+                    if (isResumeEmpty(get().resume) && loadedResumes.length > 0) {
+                        set({ resume: loadedResumes[0] });
                     }
 
+                    set({ initialLoadDone: true, isLoading: false, isSyncing: false });
+                    get().runATSAnalysis();
+
                 } catch (error) {
-                    console.error("Failed to initialize store from Convex", error);
-                    set({ isLoading: false, initialLoadDone: true });
+                    // Keep the local mirror on screen rather than blanking the
+                    // dashboard, but say so: a silent fallback to localStorage
+                    // is exactly what hid the last outage.
+                    reportSyncFailure('load your saved work', error);
+                    set({ isLoading: false, initialLoadDone: true, isSyncing: false });
                 }
             },
 
+            /**
+             * Upload records that exist only in this browser and return how many
+             * were sent. Safe to call repeatedly: a record stops matching once
+             * it has a Convex id.
+             */
+            migrateLocalOnly: async () => {
+                const localResumes = (get().savedResumes || []).filter(
+                    r => isDraftId(r.id) && !isResumeEmpty(r)
+                );
+                const localLetters = (get().savedCoverLetters || []).filter(
+                    (cl: any) => isDraftId(cl.id) && !isCoverLetterEmpty(cl)
+                );
+
+                if (localResumes.length === 0 && localLetters.length === 0) return 0;
+
+                let sent = 0;
+
+                for (const r of localResumes) {
+                    try {
+                        const newId = await convex.mutation(api.resumes.create, toResumePayload(r));
+                        // Re-point the local copy at the server record so the
+                        // next autosave patches it instead of inserting again.
+                        set((state) => ({
+                            savedResumes: (state.savedResumes || []).map(x =>
+                                x.id === r.id ? { ...x, id: newId as unknown as string } : x
+                            ),
+                            resume: state.resume?.id === r.id
+                                ? { ...state.resume, id: newId as unknown as string }
+                                : state.resume,
+                        }));
+                        sent++;
+                    } catch (err) {
+                        reportSyncFailure('upload a resume saved on this device', err);
+                    }
+                }
+
+                for (const cl of localLetters) {
+                    try {
+                        const newId = await convex.mutation(
+                            api.coverLetters.create,
+                            toCoverLetterPayload(cl)
+                        );
+                        set((state) => ({
+                            savedCoverLetters: (state.savedCoverLetters || []).map((x: any) =>
+                                x.id === cl.id ? { ...x, id: newId as unknown as string } : x
+                            ),
+                            coverLetter: state.coverLetter?.id === cl.id
+                                ? { ...state.coverLetter, id: newId as unknown as string }
+                                : state.coverLetter,
+                        }));
+                        sent++;
+                    } catch (err) {
+                        reportSyncFailure('upload a cover letter saved on this device', err);
+                    }
+                }
+
+                if (sent > 0) {
+                    toast.success(
+                        sent === 1
+                            ? "Synced 1 item that was only saved on this device."
+                            : `Synced ${sent} items that were only saved on this device.`
+                    );
+                }
+
+                return sent;
+            },
+
+            /**
+             * Wipe the local mirror on sign-out.
+             *
+             * `savedResumes` is persisted to localStorage, so without this the
+             * next person to sign in on a shared machine would see the previous
+             * user's resumes until Convex answered, and any of their unsynced
+             * drafts would be uploaded into the wrong account.
+             */
+            clearLocalData: () => {
+                set({
+                    savedResumes: [],
+                    savedCoverLetters: [],
+                    resume: { ...initialResume },
+                    coverLetter: {
+                        title: 'Untitled Cover Letter',
+                        jobTitle: '',
+                        company: '',
+                        recipient: '',
+                        body: '',
+                    },
+                    stats: { totalReviews: 0 },
+                    initialLoadDone: false,
+                    isSyncing: false,
+                });
+            },
             saveCurrentResume: async () => {
                 const { resume, savedResumes, atsScore } = get();
 
@@ -275,30 +399,20 @@ export const useResumeStore = create<ResumeState>()(
                 try {
                     const { resume } = get();
 
+                    // Normalised rather than passed through raw: a record
+                    // restored from older localStorage can be missing fields the
+                    // Convex validator requires, and one of those rejects the
+                    // whole write.
+                    const payload = toResumePayload(resume);
+
                     if (!isDraftId(resume.id)) {
                         await convex.mutation(api.resumes.update, {
                             id: resume.id as any,
-                            title: resume.title,
-                            profile: resume.profile,
-                            education: resume.education,
-                            experience: resume.experience,
-                            leadership: resume.leadership || [],
-                            projects: resume.projects,
-                            skills: resume.skills,
-                            customStyles: resume.customStyles,
+                            ...payload,
                             atsScore: atsScore,
                         });
                     } else {
-                        const newId = await convex.mutation(api.resumes.create, {
-                            title: resume.title || 'Untitled Resume',
-                            profile: resume.profile,
-                            education: resume.education || [],
-                            experience: resume.experience || [],
-                            leadership: resume.leadership || [],
-                            projects: resume.projects || [],
-                            skills: resume.skills || [],
-                            customStyles: resume.customStyles,
-                        });
+                        const newId = await convex.mutation(api.resumes.create, payload);
 
                         const updatedResume = { ...resume, id: newId };
                         set({ resume: updatedResume });

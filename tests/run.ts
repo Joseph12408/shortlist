@@ -47,6 +47,7 @@ const FAST: Suite[] = [
     { name: 'Unsubscribe link signing', file: 'unsubscribe.test.ts' },
     { name: 'Cross-platform file download', file: 'download.test.ts' },
     { name: 'Resume list naming and blanks', file: 'resume-list.test.ts' },
+    { name: 'Cross-device sync payloads', file: 'sync-payload.test.ts' },
 ];
 
 const BROWSER: Suite[] = [

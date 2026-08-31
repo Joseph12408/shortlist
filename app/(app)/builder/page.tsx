@@ -31,6 +31,7 @@ function BuilderContent() {
         setPreviewVisible,
         loadResume,
         loadCoverLetter,
+        initialLoadDone,
         setViewMode,
         resetBuilderSession,
     } = useResumeStore();
@@ -79,6 +80,28 @@ function BuilderContent() {
         // data set by the Analysis page would get wiped during navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // A deep link (/builder?mode=edit&resumeId=...) can land before the store
+    // has finished hydrating from Convex. The lookup above then finds nothing
+    // in an empty list and the editor opens blank, which looks exactly like the
+    // resume was lost. Resolve the id again once the account data has arrived.
+    const hasResolvedDeepLink = useRef(false);
+    useEffect(() => {
+        if (!initialLoadDone || hasResolvedDeepLink.current) return;
+
+        const resumeId = searchParams.get('resumeId');
+        const coverLetterId = searchParams.get('coverLetterId');
+        if (!resumeId && !coverLetterId) return;
+
+        hasResolvedDeepLink.current = true;
+
+        const state = useResumeStore.getState();
+        if (resumeId && state.resume?.id !== resumeId) {
+            loadResume(resumeId);
+        } else if (coverLetterId && state.coverLetter?.id !== coverLetterId) {
+            loadCoverLetter(coverLetterId);
+        }
+    }, [initialLoadDone, searchParams, loadResume, loadCoverLetter]);
 
     // ─── HANDLERS ─────────────────────────────────────────────────
     const handleExportPdf = async () => {

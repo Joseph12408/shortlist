@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/header";
 import { ClerkProvider } from '@clerk/nextjs'
 import { SubscriptionProvider } from "@/components/providers/subscription-provider";
 import { ConvexClientProvider } from "@/components/providers/convex-provider";
+import { StoreSyncProvider } from "@/components/providers/store-sync-provider";
 import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
 
@@ -34,11 +35,13 @@ export default function RootLayout({
           }}
         >
           <ConvexClientProvider>
-            <SubscriptionProvider>
-              <Header />
-              {children}
-              <Toaster />
-            </SubscriptionProvider>
+            <StoreSyncProvider>
+              <SubscriptionProvider>
+                <Header />
+                {children}
+                <Toaster />
+              </SubscriptionProvider>
+            </StoreSyncProvider>
           </ConvexClientProvider>
         </body>
       </html>
