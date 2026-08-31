@@ -18,6 +18,9 @@ export interface ResumeState {
     initialLoadDone: boolean;
     /** True while initialize() is in flight, so concurrent callers no-op. */
     isSyncing: boolean;
+    /** Clerk id of the account this mirror belongs to, so a different user
+     *  signing in on the same machine does not inherit it. */
+    lastUserId?: string;
     jobDescription?: string;
     atsScore?: number;
     categoryScores?: Record<string, any>;
@@ -346,12 +349,14 @@ export const useResumeStore = create<ResumeState>()(
             },
 
             /**
-             * Wipe the local mirror on sign-out.
+             * Wipe the local mirror when a different account signs in.
              *
-             * `savedResumes` is persisted to localStorage, so without this the
-             * next person to sign in on a shared machine would see the previous
-             * user's resumes until Convex answered, and any of their unsynced
-             * drafts would be uploaded into the wrong account.
+             * Called from StoreSyncProvider at sign-in, never at sign-out.
+             * Clearing on sign-out looked equivalent and was not: every
+             * signed-out page view, including a stranger opening the landing
+             * page, took that branch and deleted drafts that existed nowhere
+             * else. At sign-in the account is known, so the mirror is only
+             * dropped when it belongs to somebody else.
              */
             clearLocalData: () => {
                 set({
@@ -368,6 +373,7 @@ export const useResumeStore = create<ResumeState>()(
                     stats: { totalReviews: 0 },
                     initialLoadDone: false,
                     isSyncing: false,
+                    lastUserId: undefined,
                 });
             },
             saveCurrentResume: async () => {
@@ -1166,6 +1172,9 @@ export const useResumeStore = create<ResumeState>()(
             savedResumes: state.savedResumes,
             savedCoverLetters: state.savedCoverLetters,
             stats: state.stats,
+            // Persisted so "is this the same account as last time?" survives a
+            // reload. Without it every fresh tab looks like a new user.
+            lastUserId: state.lastUserId,
             // resume, coverLetter, viewMode are NOT persisted.
             // They are session-scoped and reset on each builder visit.
             // scanUsage is NOT persisted, quota is server-authoritative.

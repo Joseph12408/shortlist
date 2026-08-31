@@ -84,7 +84,10 @@ export function toResumePayload(r: Resume) {
     const s: any = r?.customStyles;
 
     return {
-        title: r?.title?.trim() || deriveResumeTitle(r),
+        // A placeholder is not a name. Carrying "Untitled Resume" up to the
+        // server just reproduces the column of identical titles Joseph
+        // reported, so derive one from the content instead.
+        title: isPlaceholderTitle(r?.title) ? deriveResumeTitle(r) : (r.title as string).trim(),
         profile: {
             fullName: p.fullName || '',
             email: p.email || '',
@@ -155,7 +158,9 @@ function toRolePayload(e: any) {
 /** Build the argument shape `coverLetters.create` / `update` expect. */
 export function toCoverLetterPayload(cl: any) {
     return {
-        title: cl?.title?.trim() || deriveCoverLetterTitle(cl) || 'Untitled Cover Letter',
+        title: isPlaceholderTitle(cl?.title)
+            ? (deriveCoverLetterTitle(cl) || 'Untitled Cover Letter')
+            : cl.title.trim(),
         jobTitle: cl?.jobTitle || '',
         company: cl?.company || '',
         recipient: cl?.recipient || '',

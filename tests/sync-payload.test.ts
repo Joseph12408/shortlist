@@ -46,6 +46,16 @@ const skill = p.skills[0];
 check('skill group gets an array', Array.isArray(skill.skills) && skill.skills.length === 0);
 
 check('an untitled resume is named from its content', p.title === 'Jane Mwangi, Data Analyst');
+// The first migration run pushed a resume up still called "Untitled Resume",
+// because a placeholder title is truthy. A placeholder is not a name.
+check(
+    'a placeholder title is replaced, not carried up',
+    toResumePayload({ ...legacy, title: 'Untitled Resume' } as any).title === 'Jane Mwangi, Data Analyst'
+);
+check(
+    'a real title the user chose is left alone',
+    toResumePayload({ ...legacy, title: 'Ops role, final' } as any).title === 'Ops role, final'
+);
 
 // customStyles must be complete or absent: a half-filled object is rejected.
 check('incomplete customStyles is dropped', toResumePayload({ ...legacy, customStyles: { accentColor: '#000' } } as any).customStyles === undefined);
@@ -63,6 +73,10 @@ const clp = toCoverLetterPayload(cl);
 check('cover letter is named from the job it targets', clp.title === 'Analyst at Acme');
 check('cover letter body defaults to empty', clp.body === '' && clp.recipient === '');
 check('a bare cover letter still gets a title', toCoverLetterPayload({}).title === 'Untitled Cover Letter');
+check(
+    'a placeholder cover letter title is replaced too',
+    toCoverLetterPayload({ ...cl, title: 'Untitled Cover Letter' }).title === 'Analyst at Acme'
+);
 
 console.log(failures === 0 ? '\nAll sync payload checks passed.' : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

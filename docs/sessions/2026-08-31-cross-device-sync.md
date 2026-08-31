@@ -153,3 +153,34 @@ credentials. That is his test.
 - Convex is the source of truth. localStorage is a paint-fast mirror, never a
   silent fallback that lets an outage look like success.
 - Sync failures are surfaced to the user, once per session.
+
+## Follow-up: the sign-out wipe
+
+Joseph signed in on his phone, saw the sync notice and two resumes, then
+reported that a resume created on a third device had still not appeared.
+
+The database confirmed it: two rows, one being the phone's migrated draft
+(created minutes after the deploy) and one the original. The third device's
+resume is not on the server.
+
+The cause is a bug in the first version of `StoreSyncProvider`. It cleared the
+local mirror on sign-out:
+
+    if (isAuthenticated) { initialize(); } else { clearLocalData(); }
+
+`isAuthenticated` is false for every signed-out page view, not just the moment
+somebody signs out. Opening the landing page while logged out took that branch.
+Since the whole point of the migration is that unsynced records live only in
+localStorage, this deleted exactly the data it was meant to protect, and it did
+so before the record ever had a chance to be uploaded.
+
+Reworked to check at sign-in instead: compare the Clerk user id against the
+persisted `lastUserId` and clear only when a different account signs in on the
+same machine. That keeps the shared-machine protection (the clear still happens
+before hydration, so nobody inherits the previous user's list) without a
+signed-out page view being destructive.
+
+Also fixed: `toResumePayload` treated a placeholder title as a real one, because
+"Untitled Resume" is truthy. The phone's migrated resume arrived on the server
+called "Untitled Resume" for that reason. Placeholders are now replaced with a
+derived title, and titles the user actually chose are left alone.
