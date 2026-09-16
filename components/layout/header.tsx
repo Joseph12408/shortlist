@@ -51,6 +51,9 @@ export function Header() {
                         <Link href="/#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
                             Pricing
                         </Link>
+                        <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
+                            Contact
+                        </Link>
                     </SignedOut>
 
                     {/* Links shown ONLY when signed IN */}
@@ -64,6 +67,9 @@ export function Header() {
                         <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
                             Pricing
                         </Link>
+                        <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
+                            Contact
+                        </Link>
                     </SignedIn>
 
                     <div className="flex items-center gap-4 ml-2">
@@ -71,12 +77,12 @@ export function Header() {
                             <UpgradeButton />
                         </SignedIn>
                         <SignedOut>
-                            <SignInButton mode="modal">
+                            <SignInButton mode="modal" forceRedirectUrl="/dashboard">
                                 <Button variant="ghost" size="sm">
                                     Log in
                                 </Button>
                             </SignInButton>
-                            <SignUpButton mode="modal">
+                            <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
                                 <Button size="sm">
                                     Sign up
                                 </Button>
@@ -143,6 +149,7 @@ function MobileNav() {
                             <MobileNavLink href="/#features" onNavigate={close}>Features</MobileNavLink>
                             <MobileNavLink href="/#how-it-works" onNavigate={close}>How it Works</MobileNavLink>
                             <MobileNavLink href="/#pricing" onNavigate={close}>Pricing</MobileNavLink>
+                            <MobileNavLink href="/contact" onNavigate={close}>Contact</MobileNavLink>
                         </SignedOut>
 
                         <SignedIn>
@@ -151,15 +158,16 @@ function MobileNav() {
                             <MobileNavLink href="/dashboard/cover-letters" onNavigate={close}>Cover Letters</MobileNavLink>
                             <MobileNavLink href="/dashboard/reviews" onNavigate={close}>AI Reviews</MobileNavLink>
                             <MobileNavLink href="/pricing" onNavigate={close}>Pricing</MobileNavLink>
+                            <MobileNavLink href="/contact" onNavigate={close}>Contact</MobileNavLink>
                         </SignedIn>
                     </nav>
 
                     <div className="flex flex-col gap-2 mt-auto pt-4 border-t">
                         <SignedOut>
-                            <SignInButton mode="modal">
+                            <SignInButton mode="modal" forceRedirectUrl="/dashboard">
                                 <Button variant="outline" className="w-full">Log in</Button>
                             </SignInButton>
-                            <SignUpButton mode="modal">
+                            <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
                                 <Button className="w-full">Sign up</Button>
                             </SignUpButton>
                         </SignedOut>

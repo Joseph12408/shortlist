@@ -77,6 +77,20 @@ email, Convex for storage — rather than a third-party form tool.
   proving the route loads and bot protection is active; no email/storage side
   effects.
 
+## Follow-up (same day): header link + post-auth redirect
+- Contact was only in the footer; Joseph wanted it in the header too. Added a
+  `/contact` link to `components/layout/header.tsx` in all four nav slots:
+  desktop signed-out, desktop signed-in, mobile signed-out, mobile signed-in.
+- Post-signup/login now lands on the dashboard: added
+  `forceRedirectUrl="/dashboard"` to every `SignInButton`/`SignUpButton`
+  (desktop + mobile). Auth here is modal-only (no hosted `/sign-in` routes), so
+  these four buttons cover every entry point. No conflicting Clerk redirect
+  config existed in code or env.
+- Gotcha confirmed: the header nav is gated by Clerk `<SignedOut>`/`<SignedIn>`,
+  which render client-side after hydration, so header links do NOT appear in a
+  raw `curl` of the SSR HTML (only the footer link does). Verified the page
+  serves 200 and the markup matches the existing Features/Pricing links.
+
 ## Still open
 - **Real browser happy-path not yet tested** — Arcjet blocks scripted POSTs, and
   a genuine submit sends a real email. Joseph to submit once from the live/dev
