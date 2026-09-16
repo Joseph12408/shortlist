@@ -9,6 +9,7 @@
  */
 
 import type * as analyses from "../analyses.js";
+import type * as contact from "../contact.js";
 import type * as coverLetters from "../coverLetters.js";
 import type * as emailContacts from "../emailContacts.js";
 import type * as resumes from "../resumes.js";
@@ -23,6 +24,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   analyses: typeof analyses;
+  contact: typeof contact;
   coverLetters: typeof coverLetters;
   emailContacts: typeof emailContacts;
   resumes: typeof resumes;

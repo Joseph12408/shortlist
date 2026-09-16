@@ -80,6 +80,30 @@ export const jobScanSchema = z.object({
     resumeId: z.string().max(100).optional(),
 });
 
+// ── /api/contact ────────────────────────────────────────────
+export const contactSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .min(1, "Name is required")
+        .max(200, "Name exceeds 200 character limit"),
+    email: z
+        .string()
+        .trim()
+        .min(1, "Email is required")
+        .max(320, "Email exceeds 320 character limit")
+        .email("Enter a valid email address"),
+    category: z.enum(["question", "suggestion", "problem", "other"]),
+    message: z
+        .string()
+        .trim()
+        .min(10, "Please add a little more detail (10 characters minimum)")
+        .max(5000, "Message exceeds 5,000 character limit"),
+    // Honeypot: hidden from real users, so any value here means a bot. Optional
+    // and unconstrained on purpose; the route decides what to do with it.
+    company: z.string().optional(),
+});
+
 // ── Helpers ─────────────────────────────────────────────────
 
 /** Max allowed request body size in bytes (2 MB) */

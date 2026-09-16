@@ -192,4 +192,33 @@ export default defineSchema({
          */
         pendingEmailIds: v.array(v.string()),
     }).index('by_email', ['email']),
+
+    /**
+     * Messages sent through the public /contact form.
+     *
+     * Stored before the notification email is attempted, so a Resend outage
+     * never loses a message: anything with `emailed: false` is a submission the
+     * team was not pinged about and can still be read here or in the dashboard.
+     *
+     * Written by an unauthenticated mutation because the form is open to
+     * logged-out visitors; `clerkId` is filled in only when the sender happened
+     * to be signed in.
+     */
+    contactMessages: defineTable({
+        name: v.string(),
+        email: v.string(),
+        category: v.union(
+            v.literal("question"),
+            v.literal("suggestion"),
+            v.literal("problem"),
+            v.literal("other"),
+        ),
+        message: v.string(),
+        // True once the notification email to the team went out successfully.
+        emailed: v.boolean(),
+        // Clerk id of the sender, when they were signed in at submit time.
+        clerkId: v.optional(v.string()),
+        // Set true once the message has been actioned (for a future admin view).
+        handled: v.boolean(),
+    }).index("by_handled", ["handled"]),
 });

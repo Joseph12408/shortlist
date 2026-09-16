@@ -73,5 +73,27 @@ export function getLimiter(isPro: boolean) {
     return isPro ? proLimiter : freeLimiter;
 }
 
+/**
+ * Public contact form limiter.
+ *
+ * Unlike the routes above, /contact is open to logged-out visitors, so there is
+ * no userId to key on: this bucket is keyed by IP instead. Five submissions an
+ * hour is generous for a person with a genuine problem and tight enough to stop
+ * a script hammering the form (and, through it, our Resend reputation).
+ */
+export const contactLimiter = arcjet({
+    key: process.env.ARCJET_KEY!,
+    characteristics: ["ip.src"],
+    rules: [
+        tokenBucket({
+            mode: "LIVE",
+            refillRate: 5,
+            interval: "1h",
+            capacity: 5,
+        }),
+        BOT_RULE,
+    ],
+});
+
 /** Default export kept for any caller that just needs the free-tier rules. */
 export default freeLimiter;
