@@ -55,6 +55,53 @@ discriminator still holds whenever we come back to it.
   email, category, and message. Asked Joseph for the received email's subject/
   sender to diagnose. OPEN.
 
+## Follow-up (later 2026-09-17)
+
+### Deploy verified
+Confirmed via Vercel API: production deployment for commit `ecd5e7f` (the Pro
+fix) and `6e06bf2` are both `READY`/production. The fix IS live. Joseph's "nothing
+changed" is expected — see below.
+
+### Why the leak looked unfixed
+The code fix only stops *new* self-heal grants. Accounts already stamped
+`isPro:true` in Clerk metadata keep it (fast path never re-checks). Joseph had
+deferred cleanup, so the account he was testing still showed Pro. He then asked
+to build the cleanup after all.
+
+### Cleanup script — `scripts/reconcile-pro.ts`
+Dry-run by default (`--apply` to write). Scans Clerk users marked Pro,
+re-verifies each against Whop (email-matched), and resets only self-healed
+(`selfHealedAt`, no `proPlanActivatedAt`) accounts with no active membership.
+Lifetime account always skipped; Whop-unreachable users left alone.
+
+**Dry-run finding (against the local TEST Clerk instance, `sk_test_`):** 8 users,
+3 Pro, 1 lifetime skipped, 1 confirmed active, 0 self-heal victims, and 1 flagged
+for review: `nkemvoudaniel@gmail.com` — Pro via **webhook** (`proPlanActivatedAt`)
+but **no active Whop membership**. That's a *second* leak type: a lapsed
+membership whose cancel webhook never removed Pro. Script left it untouched
+(conservative). OPEN: decide whether to reclaim webhook-activated-but-inactive
+accounts too.
+
+**Important:** the real users are in the PRODUCTION (`sk_live_`) Clerk instance.
+To clean prod, run the script with the production `CLERK_SECRET_KEY` and
+`WHOP_API_KEY` (from Vercel), not the local test keys. `envVar()` prefers
+`process.env`, so inline env vars override `.env.local`.
+
+### Contact email mystery — resolved
+Prod `contactMessages` table is EMPTY (checked via `convex data --prod`): no one
+has ever successfully submitted the form. Joseph determined the resume email he
+got was a Google Drive share sent to him, unrelated to the app. Dropped.
+Note: the contact form has therefore not been exercised by a real user in prod yet.
+
+### Privacy policy rewrite
+`app/privacy/page.tsx` rewritten from a 6-section stub into a full policy
+reflecting the actual stack (Clerk, Convex, Vercel, Gemini/OpenAI, Whop, Resend,
+Arcjet, Sentry, PostHog), with AI-processing, retention, cookies, rights,
+children, international-transfer, and contact sections. Contact points to the
+working `/contact` page. NOT legal advice — Joseph should have it reviewed.
+
 ## Decisions
 - Entitlement fix errs strict: better to under-grant via the self-heal fallback
   (webhook still covers real activations) than ever over-grant.
+- Cleanup script is dry-run-first and only auto-resets clear self-heal victims;
+  webhook-activated-but-lapsed accounts are reported, not auto-nuked.
