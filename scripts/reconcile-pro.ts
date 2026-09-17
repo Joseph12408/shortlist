@@ -20,8 +20,10 @@
  *   - If Whop can't be reached for a user, that user is left unchanged.
  *
  * Run:
- *   npx tsx scripts/reconcile-pro.ts           # report only (safe)
- *   npx tsx scripts/reconcile-pro.ts --apply   # perform the resets
+ *   npx tsx scripts/reconcile-pro.ts                       # report only (safe)
+ *   npx tsx scripts/reconcile-pro.ts --apply               # perform the resets
+ *   npx tsx scripts/reconcile-pro.ts --email a@b.com          # preview one account
+ *   npx tsx scripts/reconcile-pro.ts --email a@b.com --apply  # de-Pro one account
  *
  * Reads CLERK_SECRET_KEY and WHOP_API_KEY from the environment, falling back to
  * .env.local so it works the same way the other scripts here do. Point it at
@@ -48,6 +50,16 @@ const CLERK_SECRET_KEY = envVar("CLERK_SECRET_KEY");
 const WHOP_API_KEY = envVar("WHOP_API_KEY");
 const LIFETIME_PRO_EMAIL = "josephnjuma793@gmail.com";
 const APPLY = process.argv.includes("--apply");
+
+/**
+ * Optional targeted mode: `--email someone@example.com` resets exactly that one
+ * account's Pro flag, no Whop check. Use it to instantly de-Pro a test account
+ * and confirm the free-tier gating works. The lifetime account is still
+ * protected so you can't accidentally lock yourself out.
+ */
+const emailIdx = process.argv.indexOf("--email");
+const TARGET_EMAIL =
+    emailIdx !== -1 ? (process.argv[emailIdx + 1] || "").toLowerCase() : null;
 
 if (!CLERK_SECRET_KEY) {
     console.error("Missing CLERK_SECRET_KEY (checked env and .env.local). Aborting.");
@@ -87,7 +99,46 @@ async function isActiveOnWhop(email: string): Promise<boolean | null> {
     }
 }
 
+async function resetOneAccount(targetEmail: string) {
+    console.log(`\nReconcile Pro — targeted ${APPLY ? "APPLY" : "DRY RUN"} for ${targetEmail}\n`);
+
+    if (targetEmail === LIFETIME_PRO_EMAIL) {
+        console.log("  Refusing to reset the lifetime developer account.");
+        return;
+    }
+
+    const { data } = await clerk.users.getUserList({ emailAddress: [targetEmail] });
+    if (data.length === 0) {
+        console.log(`  No Clerk user found for ${targetEmail}.`);
+        return;
+    }
+
+    for (const u of data) {
+        const meta = (u.publicMetadata || {}) as Record<string, unknown>;
+        const isPro = meta.isPro === true || meta.isPro === "true";
+        console.log(`  ${u.id} — currently isPro=${isPro}`);
+        if (!APPLY) {
+            console.log(`  Would set isPro=false. Re-run with --apply to write.`);
+            continue;
+        }
+        await clerk.users.updateUserMetadata(u.id, {
+            publicMetadata: {
+                ...meta,
+                isPro: false,
+                proReclaimedAt: new Date().toISOString(),
+                proReclaimedReason: "manual targeted reset",
+            },
+        });
+        console.log(`  Reset isPro=false for ${targetEmail}.`);
+    }
+}
+
 async function main() {
+    if (TARGET_EMAIL) {
+        await resetOneAccount(TARGET_EMAIL);
+        return;
+    }
+
     console.log(`\nReconcile Pro — ${APPLY ? "APPLY (writes enabled)" : "DRY RUN (no writes)"}\n`);
 
     const limit = 100;

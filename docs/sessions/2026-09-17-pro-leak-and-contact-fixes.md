@@ -101,8 +101,44 @@ Arcjet, Sentry, PostHog), with AI-processing, retention, cookies, rights,
 children, international-transfer, and contact sections. Contact points to the
 working `/contact` page. NOT legal advice — Joseph should have it reviewed.
 
+## Full free/Pro gating audit (2026-09-17, requested by Joseph)
+Joseph reported free users generating optimized resumes and believed the gating
+had regressed. Audited every optimize path:
+
+- **`ai-toolbar.tsx`**: free users get an amber Crown "Generate" button that goes
+  straight to `/pricing`; it never calls optimize. (Correct.)
+- **`builder/page.tsx` `handleOptimize`**: `if (!isPro) router.push('/pricing')`.
+  (Correct.)
+- **`/api/generate`**: returns 402 `pro_required` when `!isPro`. (Correct.)
+- Entry flows — upload (`/api/parse`, free), build-from-scratch, and analysis
+  (`analysis/page.tsx` handleOptimize only *navigates* to `/builder`) — all funnel
+  into the gated Generate button. No ungated optimize path exists.
+- Grep for hardcoded bypass / `isPro = true`: only legitimate sites (lifetime
+  email, Whop-verified, webhook). No bypass.
+
+**Verdict: the gating code is correct and defense-in-depth. It did NOT regress.**
+The only way a "free" user optimizes is if their Clerk `publicMetadata.isPro` is
+`true` — i.e., their account was stamped by the old self-heal bug. Every gate
+reads that flag, so a stamped account is treated as Pro everywhere. This is a
+DATA problem (poisoned accounts), fixed by running `reconcile-pro.ts` against
+production, not a code problem.
+
+Free tier = manual build, ATS score (top-3 issues), job scan (5/mo), standard
+templates (standard/classic/minimal), watermarked PDF (3/mo). Pro = AI
+optimization, AI cover letter, detailed ATS feedback, premium templates, clean
+uncapped PDF, DOCX, unlimited saves. (Source: `lib/tiers.ts`,
+`hooks/use-feature-access.ts`.)
+
+### Added: targeted reset to reconcile-pro.ts
+`--email <addr>` mode resets exactly one account's isPro flag (dry-run without
+--apply). Lets Joseph instantly de-Pro a test account and confirm the free gate
+works, turning "trust the code" into a live demonstration. Lifetime account
+still protected.
+
 ## Decisions
 - Entitlement fix errs strict: better to under-grant via the self-heal fallback
   (webhook still covers real activations) than ever over-grant.
 - Cleanup script is dry-run-first and only auto-resets clear self-heal victims;
   webhook-activated-but-lapsed accounts are reported, not auto-nuked.
+- The free/Pro gating code is correct as of this audit; do NOT rewrite it chasing
+  this symptom. The fix is the production data cleanup.
