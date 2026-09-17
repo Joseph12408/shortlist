@@ -79,8 +79,9 @@ Lifetime account always skipped; Whop-unreachable users left alone.
 for review: `nkemvoudaniel@gmail.com` — Pro via **webhook** (`proPlanActivatedAt`)
 but **no active Whop membership**. That's a *second* leak type: a lapsed
 membership whose cancel webhook never removed Pro. Script left it untouched
-(conservative). OPEN: decide whether to reclaim webhook-activated-but-inactive
-accounts too.
+(conservative). RESOLVED: Joseph confirmed `nkemvoudaniel@gmail.com` is a test
+account he made Pro intentionally — not a leak. The script's default (never
+auto-reset webhook-activated accounts) is correct; leave that account as-is.
 
 **Important:** the real users are in the PRODUCTION (`sk_live_`) Clerk instance.
 To clean prod, run the script with the production `CLERK_SECRET_KEY` and
