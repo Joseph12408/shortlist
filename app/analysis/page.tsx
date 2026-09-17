@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Sparkles,
     UploadCloud,
     Loader2,
     FileText,
@@ -264,13 +263,6 @@ export default function AnalysisPage() {
                 <div className="flex flex-col gap-6 sm:gap-8">
                     {/* Header */}
                     <div className="flex flex-col gap-1 max-w-2xl">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                <Sparkles className="w-3.5 h-3.5" />
-                                AI ATS Engine
-                            </span>
-                            <span className="text-xs text-muted-foreground">Instant, private scoring</span>
-                        </div>
                         <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight">
                             AI Resume Analysis
                         </h1>
@@ -312,12 +304,9 @@ export default function AnalysisPage() {
                                 </div>
                             ) : (
                                 <>
-                                    <div className="relative mb-4">
+                                    <div className="mb-4">
                                         <div className="w-16 h-16 rounded-2xl bg-card shadow-md flex items-center justify-center text-primary">
                                             <UploadCloud className="w-8 h-8" />
-                                        </div>
-                                        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow">
-                                            <Sparkles className="w-3.5 h-3.5" />
                                         </div>
                                     </div>
                                     <h3 className="font-heading text-lg sm:text-xl font-semibold mb-1">
