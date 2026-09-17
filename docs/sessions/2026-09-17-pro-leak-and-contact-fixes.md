@@ -38,8 +38,12 @@ Users already wrongly flipped keep `isPro: true` in Clerk metadata; the code fix
 only stops *new* leaks. Self-healed users are identifiable by
 `publicMetadata.selfHealedAt` being set (legit ones have `proPlanActivatedAt`
 from the webhook, or are the lifetime email). Proposed: a one-off script to reset
-`isPro` for users with `selfHealedAt` and no active Whop membership. Awaiting
-Joseph's go-ahead.
+`isPro` for users with `selfHealedAt` and no active Whop membership.
+
+**Decision (2026-09-17): Joseph chose to leave already-affected accounts as-is
+for now** — only stop new leaks, assess scale later. Revisit if the free-Pro
+population turns out to be non-trivial. The `selfHealedAt` vs `proPlanActivatedAt`
+discriminator still holds whenever we come back to it.
 
 ## Other fixes
 - **Footer on dashboard**: there was no `app/dashboard/layout.tsx` and no
