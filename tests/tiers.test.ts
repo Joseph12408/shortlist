@@ -33,8 +33,17 @@ const ranked = prioritizeFeedback(result.feedback);
 
 check('weak resume scores low', result.overallScore < 50);
 check('every feedback item has a message', result.feedback.every((f) => !!f.message));
-check('errors rank before successes', ranked.findIndex((f) => f.type === 'error') < ranked.findIndex((f) => f.type === 'success'));
 check('prioritize does not drop items', ranked.length === result.feedback.length);
+
+// prioritizeFeedback orders worst-first, tested directly so it does not depend
+// on a given resume happening to produce all three severities.
+const mixed = prioritizeFeedback([
+    { category: 'Content', message: 's', type: 'success', scoreImpact: 0 },
+    { category: 'Content', message: 'e', type: 'error', scoreImpact: 0 },
+    { category: 'Content', message: 'w', type: 'warning', scoreImpact: 0 },
+] as any);
+check('errors rank before warnings before successes',
+    mixed[0].type === 'error' && mixed[1].type === 'warning' && mixed[2].type === 'success');
 
 // The paid tier is defined by detail+solution being present on actionable items.
 const actionable = result.feedback.filter((f) => f.type !== 'success');
@@ -51,6 +60,35 @@ const strongResume: any = {
 const strong = analyzeResume(strongResume, '');
 check('strong resume scores higher than weak', strong.overallScore > result.overallScore);
 check('score stays within 0-100', strong.overallScore >= 0 && strong.overallScore <= 100);
+
+// An excellent resume must be able to reach the top band with NO job description.
+// The old grader capped no-JD resumes at 90; this guards against that regressing.
+const bullet = (verb: string, n: string) =>
+    `${verb} ${n} across four regional teams by rebuilding the reporting pipeline, cutting manual effort and improving accuracy for stakeholders`;
+const role = (title: string, v1: string, v2: string, v3: string, v4: string) => ({
+    id: title, company: 'Acme', title, location: 'London', startDate: '2021', endDate: '2023', current: false,
+    description: [bullet(v1, 'revenue 32%'), bullet(v2, 'churn 18%'), bullet(v3, 'latency 40%'), bullet(v4, 'costs $250k')].join('\n'),
+});
+const excellentResume: any = {
+    profile: {
+        fullName: 'Jane Mwangi', email: 'jane@example.com', phone: '+254700000000', location: 'Nairobi, Kenya',
+        website: 'jane.dev', linkedin: 'in/jane',
+        summary: 'Product analyst with four years turning messy operational data into decisions. Strong in SQL, Python and experimentation, targeting a senior product analytics role at a growth-stage company.',
+    },
+    education: [{ id: '1', institution: 'University of Nairobi', degree: 'BSc', fieldOfStudy: 'Statistics', startDate: '2016', endDate: '2020', current: false }],
+    experience: [
+        role('Senior Data Analyst', 'Led', 'Reduced', 'Cut', 'Saved'),
+        role('Data Analyst', 'Built', 'Automated', 'Streamlined', 'Drove'),
+    ],
+    leadership: [], projects: [],
+    skills: [
+        { id: '1', category: 'Languages', skills: ['SQL', 'Python', 'R', 'TypeScript'] },
+        { id: '2', category: 'Tools', skills: ['dbt', 'Airflow', 'Tableau', 'Looker'] },
+        { id: '3', category: 'Platforms', skills: ['BigQuery', 'Snowflake', 'AWS', 'GCP'] },
+    ],
+};
+const excellent = analyzeResume(excellentResume, '');
+check('an excellent resume can exceed 90 without a job description', excellent.overallScore > 90);
 
 console.log(failures === 0 ? '\nAll tier checks passed.' : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

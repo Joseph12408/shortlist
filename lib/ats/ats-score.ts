@@ -1,4 +1,4 @@
-/* Reference content: check task.md for actual tasks. Logic being implemented in ats-score.ts */
+/* Strict, recruiter-informed resume grader. See docs/sessions for the rationale. */
 import { extractKeywords } from "./keyword-extractor";
 import { Resume } from "@/types/resume";
 
@@ -6,15 +6,9 @@ export interface ATSFeedback {
     category: 'Content' | 'Structure' | 'Keywords' | 'Writing' | 'Application';
     /** One-line verdict. Shown to every user, including free. */
     message: string;
-    /**
-     * Why this matters: the reasoning behind the verdict.
-     * Pro only: this is the "detailed explanation" half of the paid tier.
-     */
+    /** Why this matters. Pro-only detail half. */
     detail?: string;
-    /**
-     * Concrete, actionable fix the user can apply right now.
-     * Pro only: this is the "solution" half of the paid tier.
-     */
+    /** Concrete fix. Pro-only solution half. */
     solution?: string;
     type: 'success' | 'warning' | 'error';
     scoreImpact: number;
@@ -35,392 +29,583 @@ export interface ATSAnalysisResult {
     missingKeywords: string[];
 }
 
+// ── Lexicons ────────────────────────────────────────────────────────────────
+
+/** Strong past-tense openers. A bullet that starts here reads as ownership. */
+const STRONG_VERBS = new Set([
+    "led", "built", "designed", "developed", "delivered", "launched", "created",
+    "implemented", "improved", "increased", "reduced", "cut", "grew", "drove",
+    "managed", "owned", "shipped", "automated", "streamlined", "optimized",
+    "negotiated", "rebuilt", "architected", "engineered", "spearheaded",
+    "founded", "scaled", "accelerated", "generated", "saved", "won", "secured",
+    "produced", "coordinated", "directed", "established", "executed", "initiated",
+    "orchestrated", "overhauled", "pioneered", "resolved", "transformed",
+    "boosted", "authored", "analyzed", "mentored", "trained", "conducted",
+]);
+
+/** Weak, ownership-diluting phrasing. */
+const WEAK_PHRASES = [
+    "responsible for", "helped", "assisted", "worked on", "tasked with",
+    "duties included", "in charge of", "participated in", "involved in",
+    "contributed to", "part of a team",
+];
+
+/** Unverifiable self-description. */
+const BUZZWORDS = [
+    "synergy", "passionate", "team player", "go-getter", "thought leader",
+    "detail-oriented", "results-driven", "self-starter", "hardworking",
+    "dynamic", "motivated", "hard worker", "think outside the box",
+    "proven track record", "excellent communication",
+];
+
+/** Padding that rarely changes meaning. */
+const FILLER = [
+    "very", "really", "various", "successfully", "effectively", "significantly",
+    "utilize", "utilized", "leverage", "leveraged", "in order to", "a number of",
+];
+
+const PRONOUNS = /\b(i|me|my|mine|myself)\b/i;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Split a description into individual bullets. */
+function toBullets(desc?: string): string[] {
+    if (!desc) return [];
+    return desc
+        .split(/\r?\n|•|·/)
+        .map((b) => b.replace(/^[\s\-*•·•.\d)]+/, "").trim())
+        .filter((b) => b.length > 0);
+}
+
+/** A bullet counts as quantified if it carries a real figure — not a bare year. */
+function isQuantified(bullet: string): boolean {
+    const withoutYears = bullet.replace(/\b(19|20)\d{2}\b/g, " ");
+    return /%|\$|\d/.test(withoutYears) || /\b(doubled|tripled|halved)\b/i.test(bullet);
+}
+
+/** Does the bullet open with a recognised strong verb? */
+function startsStrong(bullet: string): boolean {
+    const first = bullet.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z]/g, "");
+    return !!first && STRONG_VERBS.has(first);
+}
+
+function countOccurrences(haystack: string, needles: string[]): string[] {
+    return needles.filter((n) => haystack.includes(n));
+}
+
+// ── Grader ──────────────────────────────────────────────────────────────────
+
 export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalysisResult {
     const feedback: ATSFeedback[] = [];
+
+    const profile = resume.profile || ({} as Resume["profile"]);
+    const experience = resume.experience || [];
+    const leadership = resume.leadership || [];
+    const projects = resume.projects || [];
+    const education = resume.education || [];
+    const skills = resume.skills || [];
+
+    // Roles that carry "work" bullets. Leadership reads like experience.
+    const roles = [...experience, ...leadership];
+    const allBullets = roles.flatMap((r) => toBullets(r.description));
+    const projectBullets = projects.flatMap((p) => toBullets(p.description));
+    const writingBullets = [...allBullets, ...projectBullets];
+
+    const visibleText = [
+        profile.summary || "",
+        ...roles.map((r) => r.description || ""),
+        ...projects.map((p) => p.description || ""),
+        skills.flatMap((s) => s.skills || []).join(" "),
+    ].join(" ").trim();
+
+    const hasWork = allBullets.length > 0;
+
     let contentScore = 0;
     let structureScore = 0;
     let keywordScore = 0;
     let writingScore = 0;
     let applicationScore = 0;
 
-    // --- 1. Content Quality (30 pts) ---
-    // Metrics: Usage of numbers, results-oriented language
-    // Depth: Experience length, descriptions
-    // Action verbs and summary presence
-
-    if (resume.experience.length > 0) {
-        // Quantifiable metrics across all entries
-        let metricsCount = 0;
-        let actionVerbCount = 0;
-        const rolesWithoutMetrics: string[] = [];
-
-        resume.experience.forEach(e => {
-            const desc = e.description?.toLowerCase() || '';
-            if (/\d+|%|\$|increased|reduced|saved|grew|led/.test(desc)) {
-                metricsCount++;
-            } else {
-                rolesWithoutMetrics.push(e.title || e.company || 'an untitled role');
-            }
-            // Basic check if bullets start with action verbs (approximate by looking for typical verbs at newline/starts)
-            if (/^(managed|led|designed|developed|built|created|improved|increased|implemented|delivered)/im.test(desc)) actionVerbCount++;
+    // ─── 1. CONTENT & IMPACT (30) ────────────────────────────────────────────
+    // Quantification quality (12) + verb ownership (8) + depth (6) + summary (4)
+    if (!hasWork) {
+        feedback.push({
+            category: "Content",
+            message: "No described experience found — this caps your score hard.",
+            detail: "The work section carries the most weight for both recruiters and ATS. With no described roles there is nothing to grade for impact, which is 30% of the score.",
+            solution: "Add at least your two most recent roles (internships, freelance, and serious university/side projects count) and describe each with 3–5 result-oriented bullets.",
+            type: "error",
+            scoreImpact: 0,
         });
-
-        const metricRatio = metricsCount / resume.experience.length;
-        if (metricRatio >= 0.8) {
-            contentScore += 10;
+    } else {
+        // Quantification — how many bullets carry a real figure.
+        const quantified = allBullets.filter(isQuantified).length;
+        const qRatio = quantified / allBullets.length;
+        if (qRatio >= 0.6) {
+            contentScore += 12;
             feedback.push({
-                category: 'Content',
-                message: 'Excellent use of quantifiable metrics across roles.',
-                detail: `${metricsCount} of ${resume.experience.length} roles contain numbers, percentages or outcome verbs. Recruiters spend roughly 7 seconds on a first pass, and figures are what survive that scan. They turn a claim into evidence.`,
-                solution: 'Keep this up. For an extra edge, make sure the single most impressive number on the resume sits in your top-most role, where the eye lands first.',
-                type: 'success',
-                scoreImpact: 10,
+                category: "Content",
+                message: "Most bullets are quantified with real figures.",
+                detail: `${quantified} of ${allBullets.length} bullets carry a number, percentage, or dollar figure. Metrics are what survive a 7-second scan and turn a claim into evidence.`,
+                solution: "Keep the single most impressive number in your top role's first bullet, where the eye lands first.",
+                type: "success",
+                scoreImpact: 12,
             });
-        } else if (metricRatio >= 0.4) {
-            contentScore += 5;
+        } else if (qRatio >= 0.35) {
+            contentScore += 7;
             feedback.push({
-                category: 'Content',
-                message: 'Good metrics, but quantify achievements in more roles.',
-                detail: `Only ${metricsCount} of ${resume.experience.length} roles include measurable results. Roles without numbers read as job descriptions rather than accomplishments, and reviewers discount them.`,
-                solution: `Add at least one number to: ${rolesWithoutMetrics.slice(0, 3).join(', ')}. Use the pattern "[action] [metric] by [amount] in [timeframe]", for example "Cut onboarding time 40% over two quarters". If you lack exact figures, an honest estimate with a qualifier ("~", "approximately") is still far stronger than none.`,
-                type: 'warning',
-                scoreImpact: 5,
+                category: "Content",
+                message: "Too few bullets are quantified.",
+                detail: `Only ${quantified} of ${allBullets.length} bullets contain a measurable result. Recruiters discount bullets without figures — they read as duties, not achievements. Strong resumes quantify 60%+ of bullets.`,
+                solution: 'Rewrite unquantified bullets using "[action] [metric] by [amount] in [timeframe]", e.g. "Cut report prep from 6 hours to 45 minutes". No exact figure? An honest estimate ("~", "approx.") still beats none.',
+                type: "warning",
+                scoreImpact: 7,
+            });
+        } else {
+            contentScore += 2;
+            feedback.push({
+                category: "Content",
+                message: "Almost nothing is quantified — the biggest gap on this resume.",
+                detail: `Only ${quantified} of ${allBullets.length} bullets carry a figure. Without numbers every candidate's bullets read the same, and yours cannot stand out.`,
+                solution: "For each bullet ask: how many, how much, how often, how fast? Volume handled, money saved, time cut, people supported, % improved. Lead with the result.",
+                type: "error",
+                scoreImpact: 2,
+            });
+        }
+
+        // Verb ownership — share of bullets that open with a strong verb.
+        const strong = allBullets.filter(startsStrong).length;
+        const vRatio = strong / allBullets.length;
+        if (vRatio >= 0.8) {
+            contentScore += 8;
+            feedback.push({
+                category: "Content",
+                message: "Bullets consistently open with strong action verbs.",
+                detail: `${strong} of ${allBullets.length} bullets start with an ownership verb. Leading with the verb puts the emphasis on what you did, not what you were assigned.`,
+                solution: "Vary the verbs so none repeats more than twice — reusing 'Managed' flattens the impact.",
+                type: "success",
+                scoreImpact: 8,
+            });
+        } else if (vRatio >= 0.5) {
+            contentScore += 4;
+            feedback.push({
+                category: "Content",
+                message: "Only some bullets lead with a strong verb.",
+                detail: `${strong} of ${allBullets.length} bullets open with an action verb. The rest start with a noun or a weak phrase, which reads as a job description.`,
+                solution: "Rewrite each remaining bullet to open with a past-tense verb: Led, Built, Designed, Delivered, Launched, Reduced, Automated, Negotiated.",
+                type: "warning",
+                scoreImpact: 4,
             });
         } else {
             feedback.push({
-                category: 'Content',
-                message: 'Add numbers, percentages, or dollar amounts to quantify achievements.',
-                detail: `Almost none of your ${resume.experience.length} role${resume.experience.length === 1 ? '' : 's'} contain measurable outcomes. This is the single largest scoring gap on most early-career resumes: without figures, every candidate\'s bullets read the same.`,
-                solution: 'For each role ask: how many, how much, how often, how fast? Volume handled, money saved, time cut, people supported, percentage improved. Rewrite your top three bullets to lead with the result, then the method, for example "Reduced report prep from 6 hours to 45 minutes by automating data pulls".',
-                type: 'error',
+                category: "Content",
+                message: "Most bullets do not start with an action verb.",
+                detail: `Only ${strong} of ${allBullets.length} bullets open with a recognised verb. Bullets starting with 'Responsible for' or a noun describe a role rather than your contribution.`,
+                solution: '"Responsible for the weekly report" → "Produced the weekly revenue report for a 30-person sales team." Openers: Led, Built, Designed, Delivered, Launched, Reduced.',
+                type: "error",
                 scoreImpact: 0,
             });
         }
 
-        // Action verb usage
-        if (actionVerbCount > 0) {
-            contentScore += 5;
+        // Depth — roles carrying 3–5 substantive bullets.
+        const wellDeveloped = roles.filter((r) => {
+            const b = toBullets(r.description);
+            return b.length >= 3 && b.length <= 6;
+        }).length;
+        const dRatio = wellDeveloped / roles.length;
+        if (dRatio >= 0.6) {
+            contentScore += 6;
             feedback.push({
-                category: 'Content',
-                message: 'Strong action verbs detected at start of bullets.',
-                detail: 'Leading with a verb puts the emphasis on what you did rather than what you were assigned, which reads as ownership.',
-                solution: 'Vary the verbs so they do not repeat across roles. Reusing "Managed" five times flattens the impact. Swap in Led, Built, Launched, Streamlined, Negotiated, Rebuilt as they fit.',
-                type: 'success',
-                scoreImpact: 5,
+                category: "Content",
+                message: "Roles are developed to the right depth.",
+                detail: "Your key roles carry 3–5 bullets each — enough to establish context, action, and result without spilling over into noise.",
+                solution: "As you add roles, trim the weakest bullet whenever you add a stronger one so no role runs past ~5.",
+                type: "success",
+                scoreImpact: 6,
             });
         } else {
+            contentScore += 2;
             feedback.push({
-                category: 'Content',
-                message: 'Start bullet points with strong action verbs (e.g., Managed, Delivered).',
-                detail: 'None of your bullets open with a recognised action verb. Bullets that start with "Responsible for" or a noun phrase describe a job rather than your contribution to it.',
-                solution: 'Rewrite each bullet to open with a past-tense verb. "Responsible for the weekly report" becomes "Produced the weekly revenue report for a 30-person sales team". Strong openers: Led, Built, Designed, Delivered, Launched, Reduced, Automated, Negotiated.',
-                type: 'warning',
-                scoreImpact: 0,
+                category: "Content",
+                message: "Roles are too thin — expand your recent experience.",
+                detail: "Most roles have fewer than 3 bullets. One-line roles leave the reader guessing at scope: team size, tools, budget, and who the work was for.",
+                solution: "Give your two most recent roles 3–5 bullets each using Context → Action → Result. Name the tools and the scale ('for 4 regional teams', 'across a 12k-row dataset').",
+                type: "warning",
+                scoreImpact: 2,
             });
         }
+    }
 
-        // Check for depth (description length)
-        const avgLength = resume.experience.reduce((acc, curr) => acc + (curr.description?.length || 0), 0) / resume.experience.length;
-        if (avgLength > 150) {
-            contentScore += 10;
-            feedback.push({
-                category: 'Content',
-                message: 'Good depth in role descriptions.',
-                detail: `Your descriptions average ~${Math.round(avgLength)} characters, enough room to establish context, action and result rather than just a job title.`,
-                solution: 'Watch the upper bound as you add more: past roughly 5 bullets per role, readers skim. Trim the weakest bullet whenever you add a stronger one.',
-                type: 'success',
-                scoreImpact: 10,
-            });
-        } else {
-            contentScore += 5;
-            feedback.push({
-                category: 'Content',
-                message: 'Expand on role descriptions. Explain "how" and "why", not just "what".',
-                detail: `Your descriptions average only ~${Math.round(avgLength)} characters. That is typically one thin line per role, which leaves the reader guessing at scope: team size, budget, tools, and who the work was for.`,
-                solution: 'Target 3-5 bullets per recent role. For each, use Context, then Action, then Result: what problem existed, what you specifically did, and what changed as a result. Name the tools and the scale ("for 4 regional teams", "across a 12k-row dataset").',
-                type: 'warning',
-                scoreImpact: 5,
-            });
-        }
+    // Summary (4) — present, substantial, third-person.
+    const summary = (profile.summary || "").trim();
+    if (summary.length >= 120 && !PRONOUNS.test(summary)) {
+        contentScore += 4;
+        feedback.push({
+            category: "Content",
+            message: "Professional summary is present and well-framed.",
+            detail: "A tight, third-person summary frames how the rest of the page is read and is prime keyword real estate for ATS matching.",
+            solution: "Tailor its first line per application to echo the target job title — the single highest-leverage keyword edit.",
+            type: "success",
+            scoreImpact: 4,
+        });
+    } else if (summary.length > 0) {
+        contentScore += 2;
+        feedback.push({
+            category: "Content",
+            message: summary.length < 120 ? "Summary is too short to do its job." : "Summary uses first-person pronouns.",
+            detail: summary.length < 120
+                ? "A one-line summary wastes the most valuable space on the page and the densest keyword block for ATS."
+                : "First-person ('I', 'my') reads informally on a resume and eats characters. Resume summaries are written in implied third person.",
+            solution: 'Write 2–3 sentences, no "I/my": role identity + years/level + two or three strongest skills + what you target. E.g. "Data analyst with 2 years in retail forecasting; strong in SQL, Python and dashboard design; targeting product analytics."',
+            type: "warning",
+            scoreImpact: 2,
+        });
     } else {
         feedback.push({
-            category: 'Content',
-            message: 'No experience listed. This significantly hurts your score.',
-            detail: 'The Experience section carries the most weight in both ATS parsing and human review. An empty one caps your achievable score at well under half.',
-            solution: 'Add anything with real deliverables: internships, freelance or contract work, university projects, society or volunteer roles. Early-career resumes are allowed to lead with coursework and projects. What matters is that the work is described in terms of outcomes.',
-            type: 'error',
+            category: "Content",
+            message: "No professional summary — add one.",
+            detail: "Without a summary the reader must infer your target role from your history, and the ATS loses the densest keyword block on the page.",
+            solution: 'Add 2–3 sentences: role + years, top skills, and what you are targeting. Mirror the job title from the posting in the first line.',
+            type: "error",
             scoreImpact: 0,
         });
     }
 
-    // Summary presence and quality
-    if (resume.profile.summary && resume.profile.summary.trim().length > 50) {
-        contentScore += 5;
-        feedback.push({
-            category: 'Content',
-            message: 'Professional summary is present and detailed.',
-            detail: 'A summary is the one place you get to frame how the rest of the page should be read, and it is prime keyword real estate for ATS matching.',
-            solution: 'Tailor the summary per application. Mirror the job title from the posting in its first line. That single change lifts keyword match rate more than any other edit.',
-            type: 'success',
-            scoreImpact: 5,
-        });
-    } else {
-        feedback.push({
-            category: 'Content',
-            message: 'Missing or too short professional summary. Add one to boost your score.',
-            detail: 'Without a summary the reader has to infer your target role from your history, and the ATS loses the densest keyword block on the page.',
-            solution: 'Write 2-3 sentences: your role and years of experience, your strongest two or three skills, and what you are targeting. Example: "Data analyst with 2 years in retail forecasting. Strong in SQL, Python and dashboard design. Looking to move into a product analytics role."',
-            type: 'error',
-            scoreImpact: 0,
-        });
-    }
-
-    // --- 2. ATS & Structure (20 pts) ---
-    // Core sections check
-    const hasExp = resume.experience.length > 0;
-    const hasEdu = resume.education.length > 0;
-    const hasSkills = resume.skills.length > 0;
-
+    // ─── 2. STRUCTURE & FORMAT (20) ──────────────────────────────────────────
+    // Sections (8) + volume (6) + bullets present (3) + education complete (3)
+    const hasExp = experience.length > 0;
+    const hasEdu = education.length > 0;
+    const hasSkills = skills.length > 0;
     if (hasExp && hasEdu && hasSkills) {
-        structureScore += 10;
+        structureScore += 8;
         feedback.push({
-            category: 'Structure',
-            message: 'All essential sections (Experience, Education, Skills) are present.',
-            detail: 'Applicant tracking systems map your resume onto a fixed schema. All three expected sections are present and named conventionally, so parsing should be clean.',
-            solution: 'Keep the standard headings exactly as they are. Creative labels like "Where I have been" break ATS section detection even though they read well to a human.',
-            type: 'success',
-            scoreImpact: 10,
+            category: "Structure",
+            message: "All essential sections are present.",
+            detail: "Experience, Education and Skills are all present and conventionally named, so ATS section detection will map cleanly.",
+            solution: "Keep the standard headings exactly — creative labels break ATS section detection even when they read well.",
+            type: "success",
+            scoreImpact: 8,
         });
     } else {
-        const missingSections = [
-            !hasExp && 'Experience',
-            !hasEdu && 'Education',
-            !hasSkills && 'Skills',
-        ].filter(Boolean) as string[];
-
+        const missingSections = [!hasExp && "Experience", !hasEdu && "Education", !hasSkills && "Skills"].filter(Boolean) as string[];
         feedback.push({
-            category: 'Structure',
-            message: 'Missing essential sections. Ensure Experience, Education, and Skills are included.',
-            detail: `Missing: ${missingSections.join(', ')}. Many ATS filters reject or down-rank a resume outright when an expected section cannot be found, before a human ever sees it.`,
-            solution: `Add ${missingSections.join(' and ')} using those exact section names. Even a sparse section beats an absent one. A Skills block listing your tools takes two minutes and is heavily keyword-weighted.`,
-            type: 'error',
+            category: "Structure",
+            message: `Missing essential section${missingSections.length > 1 ? "s" : ""}: ${missingSections.join(", ")}.`,
+            detail: `Many ATS filters down-rank or reject a resume when an expected section is absent, before a human sees it.`,
+            solution: `Add ${missingSections.join(" and ")} using those exact names. Even a sparse Skills block is heavily keyword-weighted and takes two minutes.`,
+            type: "error",
             scoreImpact: 0,
         });
     }
 
-    // Length Check
-    const totalContent = JSON.stringify(resume).length;
-    if (totalContent > 1500 && totalContent < 6000) {
-        structureScore += 10;
+    const vlen = visibleText.length;
+    if (vlen >= 1200 && vlen <= 5000) {
+        structureScore += 6;
         feedback.push({
-            category: 'Structure',
-            message: 'Optimal resume length for ATS parsing.',
-            detail: 'Your content volume lands in the range that fits one well-spaced page: dense enough to prove substance, short enough to be read in full.',
-            solution: 'Hold this length as you tailor per application. When you add a role, cut the oldest or least relevant one rather than letting it spill onto a second page.',
-            type: 'success',
-            scoreImpact: 10,
+            category: "Structure",
+            message: "Content volume fits a well-spaced page.",
+            detail: "Your visible content is dense enough to prove substance and short enough to be read in full — the sweet spot for one page.",
+            solution: "Hold this as you tailor: when you add a role, cut the oldest or least relevant rather than spilling to a second page.",
+            type: "success",
+            scoreImpact: 6,
         });
     } else {
-        const tooShort = totalContent <= 1500;
+        const tooShort = vlen < 1200;
+        structureScore += 2;
         feedback.push({
-            category: 'Structure',
-            message: 'Resume might be too short or too long. Aim for dense content.',
+            category: "Structure",
+            message: tooShort ? "Not enough content to fill a convincing page." : "Resume is running long.",
             detail: tooShort
-                ? 'There is not yet enough content to fill a convincing page. Sparse resumes read as thin experience even when the candidate is strong.'
-                : 'The resume is running long. Past one page for an early-career candidate, reviewers stop reading and the strongest material gets buried.',
+                ? "Sparse resumes read as thin experience even when the candidate is strong."
+                : "Past one page for an early-career candidate, reviewers stop reading and the strongest material gets buried.",
             solution: tooShort
-                ? 'Expand your two most recent roles to 3-5 result-oriented bullets each, and add a Projects section. Side and academic projects legitimately count at this stage.'
-                : 'Cut to one page: drop roles older than ~6 years, remove any bullet without a concrete outcome, and compress your Skills list to what the target job actually asks for.',
-            type: 'warning',
+                ? "Expand your two most recent roles to 3–5 result bullets and add a Projects section."
+                : "Cut to one page: drop roles older than ~6 years, remove any bullet without an outcome, and trim Skills to what the target job asks for.",
+            type: "warning",
+            scoreImpact: 2,
+        });
+    }
+
+    if (hasWork && roles.every((r) => toBullets(r.description).length > 0)) {
+        structureScore += 3;
+    } else if (hasWork) {
+        feedback.push({
+            category: "Structure",
+            message: "Some roles have no bullet points.",
+            detail: "A role with a title but no bullets is dead weight — it adds a line to the page without adding evidence.",
+            solution: "Give every listed role at least two result-oriented bullets, or remove it if it no longer earns its space.",
+            type: "warning",
             scoreImpact: 0,
         });
     }
 
-    // --- 3. Job Optimization (20 pts) ---
+    const eduComplete = hasEdu && education.every((e) => e.institution && e.degree && (e.startDate || e.endDate || e.current));
+    if (eduComplete) {
+        structureScore += 3;
+    } else if (hasEdu) {
+        feedback.push({
+            category: "Structure",
+            message: "Education entries are missing details.",
+            detail: "Incomplete education (no degree, institution, or dates) looks unfinished and can leave ATS fields blank.",
+            solution: "For each entry include institution, degree/field, and dates. Add a grade only if it is strong.",
+            type: "warning",
+            scoreImpact: 0,
+        });
+    }
+
+    // ─── 3. KEYWORDS & SKILLS (15) ───────────────────────────────────────────
+    // With a JD: keyword-match precision. Without: skills-section richness.
     let matched: string[] = [];
     let missing: string[] = [];
+    const allSkills = skills.flatMap((s) => s.skills || []).filter(Boolean);
 
     if (jobDescription && jobDescription.trim().length > 50) {
-        const jdKeywords = extractKeywords(jobDescription);
-        const targetKeywords = jdKeywords.slice(0, 15);
-
+        const targetKeywords = extractKeywords(jobDescription).slice(0, 15);
         if (targetKeywords.length > 0) {
-            const resumeText = JSON.stringify(resume).toLowerCase();
-            targetKeywords.forEach(k => {
-                if (resumeText.includes(k.toLowerCase())) matched.push(k);
-                else missing.push(k);
-            });
-
+            const resumeText = visibleText.toLowerCase();
+            targetKeywords.forEach((k) => (resumeText.includes(k.toLowerCase()) ? matched.push(k) : missing.push(k)));
             const matchRate = matched.length / targetKeywords.length;
-            const pts = Math.round(matchRate * 20);
-            keywordScore += pts;
-
-            const topMissing = missing.slice(0, 5).join(', ');
-
-            if (matchRate > 0.6) {
+            keywordScore += Math.round(matchRate * 15);
+            const topMissing = missing.slice(0, 5).join(", ");
+            if (matchRate > 0.7) {
                 feedback.push({
-                    category: 'Keywords',
-                    message: 'Strong keyword alignment with the job description.',
-                    detail: `You match ${matched.length} of ${targetKeywords.length} high-priority terms (${Math.round(matchRate * 100)}%). That clears the keyword threshold most ATS rankings apply.`,
-                    solution: missing.length
-                        ? `To push higher, work in the remaining terms where they are genuinely true of you: ${topMissing}.`
-                        : 'You are matching every priority term. Focus your remaining effort on the Content and Writing categories.',
-                    type: 'success',
-                    scoreImpact: pts,
+                    category: "Keywords",
+                    message: "Strong keyword alignment with the job description.",
+                    detail: `You match ${matched.length} of ${targetKeywords.length} priority terms (${Math.round(matchRate * 100)}%), clearing the threshold most ATS rankings apply.`,
+                    solution: missing.length ? `Work in the rest where genuinely true of you: ${topMissing}.` : "You match every priority term — focus remaining effort on Content and Writing.",
+                    type: "success",
+                    scoreImpact: Math.round(matchRate * 15),
                 });
-            } else if (matchRate > 0.3) {
+            } else if (matchRate > 0.4) {
                 feedback.push({
-                    category: 'Keywords',
-                    message: 'Moderate keyword match. Review missing terms.',
-                    detail: `You match ${matched.length} of ${targetKeywords.length} priority terms (${Math.round(matchRate * 100)}%). Ranked ATS shortlists usually favour candidates above roughly 60%, so this may not surface you.`,
-                    solution: `Weave these into your summary, skills and bullets where they are accurate: ${topMissing}. Mirror the posting's exact wording: an ATS matching on "React.js" will not always credit "React". Never claim a skill you do not have; instead surface the closest genuine equivalent.`,
-                    type: 'warning',
-                    scoreImpact: pts,
+                    category: "Keywords",
+                    message: "Moderate keyword match — tighten it to the posting.",
+                    detail: `You match ${matched.length} of ${targetKeywords.length} priority terms (${Math.round(matchRate * 100)}%). Ranked ATS shortlists usually favour 70%+.`,
+                    solution: `Weave these in where accurate: ${topMissing}. Mirror exact wording — "React.js" ≠ "React" to some ATS. Never claim a skill you lack.`,
+                    type: "warning",
+                    scoreImpact: Math.round(matchRate * 15),
                 });
             } else {
                 feedback.push({
-                    category: 'Keywords',
-                    message: 'Low keyword match. Tailor your resume more closely to the JD.',
-                    detail: `You match only ${matched.length} of ${targetKeywords.length} priority terms (${Math.round(matchRate * 100)}%). At this level the application is likely filtered out before human review, regardless of how strong your experience is.`,
-                    solution: `Start with the summary: restate the target job title verbatim. Then add a Skills line covering the tools named in the posting that you genuinely use. Highest-value terms missing right now: ${topMissing}. If most of these are genuinely outside your experience, this posting may simply be a poor fit. That is useful signal too.`,
-                    type: 'error',
-                    scoreImpact: pts,
+                    category: "Keywords",
+                    message: "Low keyword match — likely filtered before human review.",
+                    detail: `You match only ${matched.length} of ${targetKeywords.length} priority terms (${Math.round(matchRate * 100)}%).`,
+                    solution: `Restate the target job title in your summary, add a Skills line covering the posting's tools you genuinely use. Missing: ${topMissing}. If most are outside your experience, this posting may be a poor fit.`,
+                    type: "error",
+                    scoreImpact: Math.round(matchRate * 15),
                 });
             }
-        } else {
-            keywordScore += 10;
-            feedback.push({
-                category: 'Keywords',
-                message: 'Could not extract specific keywords, assuming general fit.',
-                detail: 'The pasted text did not yield distinctive terms. It may be mostly company boilerplate or benefits copy rather than role requirements.',
-                solution: 'Paste the "Requirements", "Qualifications" or "What you will do" section specifically, rather than the whole posting.',
-                type: 'warning',
-                scoreImpact: 10,
-            });
         }
     } else {
-        keywordScore += 10; // Neutral baseline when there is no JD to match against
-        feedback.push({
-            category: 'Keywords',
-            message: 'No job description provided. Add a JD to unlock accurate keyword scoring.',
-            detail: 'Without a target posting this category is scored at a neutral baseline, so your overall figure is a general-quality score rather than a fit score for a specific job.',
-            solution: 'Paste the job description you are applying to. Keyword alignment is the single highest-leverage change you can make per application, and it can only be measured against a real posting.',
-            type: 'warning',
-            scoreImpact: 10,
-        });
+        // No JD: grade the Skills section itself so 100 stays reachable.
+        const categorised = skills.length >= 2;
+        if (allSkills.length >= 10 && categorised) {
+            keywordScore += 15;
+            feedback.push({
+                category: "Keywords",
+                message: "Skills section is rich and organised.",
+                detail: `You list ${allSkills.length} concrete skills across ${skills.length} groups. A dense, categorised Skills block is heavily keyword-weighted by ATS.`,
+                solution: "Paste a target job description to score keyword *precision* against a specific role — the highest-leverage per-application edit.",
+                type: "success",
+                scoreImpact: 15,
+            });
+        } else if (allSkills.length >= 5) {
+            keywordScore += 9;
+            feedback.push({
+                category: "Keywords",
+                message: "Skills section is thin — add more concrete tools.",
+                detail: `Only ${allSkills.length} skills listed${categorised ? "" : " in a single group"}. Recruiters and ATS scan this block for hard skills; a short list limits your keyword surface.`,
+                solution: "List 10+ concrete, real skills grouped by type (e.g. Languages, Tools, Platforms). Then paste a job description to grade precision against a specific posting.",
+                type: "warning",
+                scoreImpact: 9,
+            });
+        } else {
+            keywordScore += 3;
+            feedback.push({
+                category: "Keywords",
+                message: "Skills section is missing or nearly empty.",
+                detail: "Hard skills are where ATS keyword matching lives. With almost none listed, keyword-ranked searches will not surface you.",
+                solution: "Add a Skills section with your real tools, languages and platforms, grouped by type. Then paste a job description to measure fit against a specific role.",
+                type: "error",
+                scoreImpact: 3,
+            });
+        }
     }
 
-    // --- 4. Writing Quality (15 pts) ---
-    const weakWords = ['responsible for', 'helped', 'assisted', 'worked on'];
-    const buzzwords = ['synergy', 'passionate', 'team player', 'go-getter', 'thought leader'];
-    const resumeStrLower = JSON.stringify(resume).toLowerCase();
+    // ─── 4. WRITING QUALITY (20) ─────────────────────────────────────────────
+    // Only graded when there is writing to assess.
+    if (!hasWork && writingBullets.length === 0) {
+        // nothing to grade → 0, the Content errors already explain why.
+    } else {
+        writingScore = 20;
+        const lowerText = writingBullets.join(" \n ").toLowerCase();
 
-    let writingPenalty = 0;
+        const weak = countOccurrences(lowerText, WEAK_PHRASES);
+        if (weak.length > 0) {
+            writingScore -= 5;
+            feedback.push({
+                category: "Writing",
+                message: 'Weak, passive phrasing found (e.g. "Responsible for").',
+                detail: `Found: ${weak.slice(0, 4).map((w) => `"${w}"`).join(", ")}. These describe proximity to work rather than ownership, and waste space that could carry a result.`,
+                solution: '"Responsible for X" → "Ran X, delivering [result]". "Helped with X" → name your specific contribution. Claim what you owned, however small.',
+                type: "warning",
+                scoreImpact: -5,
+            });
+        }
 
-    const foundWeakWords = weakWords.filter(w => resumeStrLower.includes(w));
-    if (foundWeakWords.length > 0) {
-        writingPenalty += 5;
-        feedback.push({
-            category: 'Writing',
-            message: 'Avoid passive phrases like "Responsible for". Use action verbs.',
-            detail: `Found: ${foundWeakWords.map(w => `"${w}"`).join(', ')}. These phrases describe proximity to work rather than ownership of it, and they consume space that could carry a result.`,
-            solution: '"Responsible for X" becomes "Ran X, delivering [result]". "Helped with X" becomes naming your specific contribution: "Built the reporting layer of X". "Assisted" becomes stating what you personally owned, however small; a narrow claim you own outright beats a vague share of a big one.',
-            type: 'warning',
-            scoreImpact: -5,
-        });
+        const buzz = countOccurrences(lowerText, BUZZWORDS);
+        if (buzz.length > 0) {
+            writingScore -= 5;
+            feedback.push({
+                category: "Writing",
+                message: "Clichés / buzzwords found — show, don't tell.",
+                detail: `Found: ${buzz.slice(0, 4).map((w) => `"${w}"`).join(", ")}. Self-assessed traits carry no evidence; every applicant claims them.`,
+                solution: '"Team player" → "Coordinated across design and QA to ship on a 3-week cycle." Replace each trait with the evidence behind it.',
+                type: "warning",
+                scoreImpact: -5,
+            });
+        }
+
+        const filler = countOccurrences(lowerText, FILLER);
+        if (filler.length >= 2) {
+            writingScore -= 3;
+            feedback.push({
+                category: "Writing",
+                message: "Filler words are diluting your bullets.",
+                detail: `Found: ${filler.slice(0, 4).map((w) => `"${w}"`).join(", ")}. Words like "very", "successfully" and "leverage" add length without meaning.`,
+                solution: "Cut every word that doesn't change the sentence's meaning. Tight writing signals clear thinking.",
+                type: "warning",
+                scoreImpact: -3,
+            });
+        }
+
+        // Overly long bullets.
+        const longBullets = writingBullets.filter((b) => b.length > 240).length;
+        if (longBullets > 0) {
+            writingScore -= 4;
+            feedback.push({
+                category: "Writing",
+                message: `${longBullets} bullet${longBullets > 1 ? "s run" : " runs"} too long.`,
+                detail: "Bullets over ~2 lines lose the reader, who scans only the first ~6 words of each line. Long bullets bury the outcome.",
+                solution: "Split each long bullet into one idea per line, two lines maximum, with the result front-loaded.",
+                type: "warning",
+                scoreImpact: -4,
+            });
+        }
+
+        // Repeated opening verb.
+        const openers = allBullets.map((b) => b.trim().split(/\s+/)[0]?.toLowerCase()).filter(Boolean) as string[];
+        const counts = openers.reduce<Record<string, number>>((m, v) => ((m[v] = (m[v] || 0) + 1), m), {});
+        const repeated = Object.entries(counts).find(([, n]) => n >= 3);
+        if (repeated) {
+            writingScore -= 3;
+            feedback.push({
+                category: "Writing",
+                message: `The verb "${repeated[0]}" opens ${repeated[1]} bullets.`,
+                detail: "Repeating the same opener flattens impact and reads as monotony to a human reviewer.",
+                solution: "Vary openers so none repeats more than twice: Led, Built, Launched, Streamlined, Negotiated, Rebuilt, Drove.",
+                type: "warning",
+                scoreImpact: -3,
+            });
+        }
+
+        writingScore = Math.max(0, writingScore);
+        if (writingScore === 20) {
+            feedback.push({
+                category: "Writing",
+                message: "Tight, active, evidence-led writing.",
+                detail: "No weak phrasing, clichés, filler, over-long bullets, or repeated openers. Your bullets assert ownership and stay scannable.",
+                solution: "Final pass: read each bullet aloud and cut any word that doesn't change its meaning.",
+                type: "success",
+                scoreImpact: 20,
+            });
+        }
     }
 
-    const foundBuzzwords = buzzwords.filter(w => resumeStrLower.includes(w));
-    if (foundBuzzwords.length > 0) {
-        writingPenalty += 5;
-        feedback.push({
-            category: 'Writing',
-            message: 'Avoid cliches and buzzwords (e.g., "team player", "synergy"). Show, don\'t tell.',
-            detail: `Found: ${foundBuzzwords.map(w => `"${w}"`).join(', ')}. Self-assessed traits carry no evidence. Every applicant claims them, so they read as filler.`,
-            solution: 'Replace each with the evidence behind it. "Team player" becomes "Coordinated across design and QA to ship on a 3-week cycle". "Passionate about X" becomes a project you built in X on your own time.',
-            type: 'warning',
-            scoreImpact: -5,
-        });
-    }
-
-    writingScore = Math.max(0, 15 - writingPenalty);
-    if (writingPenalty === 0) {
-        feedback.push({
-            category: 'Writing',
-            message: 'Strong, active language with no buzzwords detected.',
-            detail: 'No passive constructions or cliches found. Your bullets assert ownership and avoid unverifiable self-description.',
-            solution: 'Final pass: read each bullet aloud and cut any word that does not change its meaning. Tight writing signals clear thinking.',
-            type: 'success',
-            scoreImpact: 15,
-        });
-    } else if (writingPenalty < 10) {
-        feedback.push({
-            category: 'Writing',
-            message: 'Writing is okay, but can be more active and direct.',
-            detail: 'Most of your writing is solid; the flagged phrases above are what is holding this category back.',
-            solution: 'Fix the specific phrases listed above. It is usually a 10-minute edit worth a full 5 points.',
-            type: 'success',
-            scoreImpact: writingScore,
-        });
-    }
-
-    // --- 5. Application Ready (15 pts) ---
-    const { email, phone, location, linkedin } = resume.profile;
+    // ─── 5. APPLICATION READY (15) ───────────────────────────────────────────
+    // Contact (6) + link (3) + dates (3) + polish (3)
+    const { email, phone, location, linkedin, website } = profile;
     if (email && phone && location) {
-        applicationScore += 10;
+        applicationScore += 6;
         feedback.push({
-            category: 'Application',
-            message: 'Contact information is complete.',
-            detail: 'Email, phone and location are all present. Missing contact fields are a common silent rejection: a recruiter who cannot reach you moves on.',
-            solution: 'Check the email reads professionally and that location is written as "City, Country" (or "City, State"). Remote-friendly postings still filter on region for timezone and right-to-work reasons.',
-            type: 'success',
-            scoreImpact: 10,
+            category: "Application",
+            message: "Contact information is complete.",
+            detail: "Email, phone and location are all present. A missing contact field is a common silent rejection.",
+            solution: 'Check the email reads professionally and location is "City, Country" (or "City, State").',
+            type: "success",
+            scoreImpact: 6,
         });
     } else {
-        const missingContact = [
-            !email && 'email',
-            !phone && 'phone',
-            !location && 'location',
+        const missingContact = [!email && "email", !phone && "phone", !location && "location"].filter(Boolean) as string[];
+        feedback.push({
+            category: "Application",
+            message: `Incomplete contact details: ${missingContact.join(", ")}.`,
+            detail: "ATS platforms populate the candidate record from these fields; a blank one can leave your application incomplete on the recruiter's side.",
+            solution: `Add your ${missingContact.join(", ")}. Use a personal email you check daily, not a university or work address that may expire.`,
+            type: "error",
+            scoreImpact: 0,
+        });
+    }
+
+    if (linkedin || website) {
+        applicationScore += 3;
+    } else {
+        feedback.push({
+            category: "Application",
+            message: "Add a LinkedIn profile or portfolio link.",
+            detail: "For early-career candidates the strongest evidence often lives off-page: projects, recommendations, and work samples that won't fit here.",
+            solution: "Add your LinkedIn at minimum. If you write code or design, a GitHub or portfolio link is worth more than another bullet.",
+            type: "warning",
+            scoreImpact: 0,
+        });
+    }
+
+    // Dates on experience.
+    const datedRoles = experience.filter((e) => e.startDate && (e.endDate || e.current)).length;
+    if (!hasExp || datedRoles === experience.length) {
+        applicationScore += 3;
+    } else {
+        feedback.push({
+            category: "Application",
+            message: "Some roles are missing dates.",
+            detail: "Undated roles create the impression of gaps or padding, and recruiters read missing dates as something being hidden.",
+            solution: "Add start and end dates (or 'Present') to every role. Consistent MM/YYYY formatting throughout reads as polish.",
+            type: "warning",
+            scoreImpact: 0,
+        });
+    }
+
+    // Polish: no future dates, no double spaces, no lowercase standalone "i".
+    const currentYear = new Date().getFullYear();
+    const years = (visibleText.match(/\b(19|20)\d{2}\b/g) || []).map(Number);
+    const futureDated = years.some((y) => y > currentYear + 1);
+    const doubleSpace = /\S {2,}\S/.test(visibleText);
+    const lowerI = /\bi\b/.test(" " + (writingBullets.join(" ") + " " + summary));
+    if (!futureDated && !doubleSpace && !lowerI && hasWork) {
+        applicationScore += 3;
+    } else if (hasWork) {
+        const issues = [
+            futureDated && "a date in the future",
+            doubleSpace && "double spaces",
+            lowerI && 'a lowercase "i"',
         ].filter(Boolean) as string[];
-
         feedback.push({
-            category: 'Application',
-            message: 'Ensure Email, Phone, and Location are all valid.',
-            detail: `Missing: ${missingContact.join(', ')}. ATS platforms populate their candidate record from these fields; a blank one can leave your application incomplete on the recruiter's side.`,
-            solution: `Add your ${missingContact.join(', ')} to the Profile section. Use a personal email you check daily rather than a university or work address that may expire.`,
-            type: 'error',
+            category: "Application",
+            message: "Small polish issues are showing.",
+            detail: `Found: ${issues.join(", ")}. Recruiters read careless details on a resume as careless work.`,
+            solution: "Fix the flagged items, then proofread once end to end (or read it aloud). Typos are one of the fastest silent rejections.",
+            type: "warning",
             scoreImpact: 0,
         });
     }
 
-    if (linkedin || resume.profile.website) {
-        applicationScore += 5;
-        feedback.push({
-            category: 'Application',
-            message: 'Professional links included.',
-            detail: 'A LinkedIn or portfolio link gives reviewers somewhere to verify and expand on what the page claims, which matters most when your experience is still short.',
-            solution: 'Make sure the linked profile is current and consistent with this resume. Conflicting dates or titles between the two is a recognised red flag.',
-            type: 'success',
-            scoreImpact: 5,
-        });
-    } else {
-        feedback.push({
-            category: 'Application',
-            message: 'Add a LinkedIn profile or portfolio link.',
-            detail: 'No professional link found. For early-career candidates this is often where the strongest evidence lives: projects, recommendations, and work samples that will not fit on one page.',
-            solution: 'Add your LinkedIn URL at minimum. If you write code or design, a GitHub or portfolio link is worth more than another bullet point.',
-            type: 'warning',
-            scoreImpact: 0,
-        });
-    }
-
-    // Compile Result
+    // ─── Compile ─────────────────────────────────────────────────────────────
     const categoryScores: Record<string, CategoryScore> = {
-        'Content': { name: 'Content Quality', score: contentScore, maxScore: 30, feedback: feedback.filter(f => f.category === 'Content') },
-        'Structure': { name: 'ATS & Structure', score: structureScore, maxScore: 20, feedback: feedback.filter(f => f.category === 'Structure') },
-        'Keywords': { name: 'Job Optimization', score: keywordScore, maxScore: 20, feedback: feedback.filter(f => f.category === 'Keywords') },
-        'Writing': { name: 'Writing Quality', score: writingScore, maxScore: 15, feedback: feedback.filter(f => f.category === 'Writing') },
-        'Application': { name: 'Application Ready', score: applicationScore, maxScore: 15, feedback: feedback.filter(f => f.category === 'Application') }
+        Content: { name: "Content & Impact", score: contentScore, maxScore: 30, feedback: feedback.filter((f) => f.category === "Content") },
+        Structure: { name: "Structure & Format", score: structureScore, maxScore: 20, feedback: feedback.filter((f) => f.category === "Structure") },
+        Keywords: { name: "Keywords & Skills", score: keywordScore, maxScore: 15, feedback: feedback.filter((f) => f.category === "Keywords") },
+        Writing: { name: "Writing Quality", score: writingScore, maxScore: 20, feedback: feedback.filter((f) => f.category === "Writing") },
+        Application: { name: "Application Ready", score: applicationScore, maxScore: 15, feedback: feedback.filter((f) => f.category === "Application") },
     };
 
     const overallScore = contentScore + structureScore + keywordScore + writingScore + applicationScore;
@@ -430,7 +615,7 @@ export function analyzeResume(resume: Resume, jobDescription: string): ATSAnalys
         categoryScores,
         feedback,
         matchedKeywords: matched,
-        missingKeywords: missing
+        missingKeywords: missing,
     };
 }
 
