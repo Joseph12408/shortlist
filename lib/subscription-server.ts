@@ -75,11 +75,24 @@ export async function getEntitlementWithSync(): Promise<Entitlement> {
                 const data = await res.json();
                 const items = data.items || data.data || data;
                 if (Array.isArray(items)) {
-                    const active = items.find(
-                        (m: any) =>
+                    const wanted = email.toLowerCase();
+                    const active = items.find((m: any) => {
+                        // Never trust that the API filtered by email. A
+                        // membership only counts if it demonstrably belongs to
+                        // THIS user: without this check, an unfiltered list (or
+                        // an ignored `?email=` param) would hand Pro to every
+                        // caller that shares a Whop account with any active
+                        // member.
+                        const memberEmail = String(
+                            m.email ?? m.user?.email ?? ""
+                        ).toLowerCase();
+                        if (!memberEmail || memberEmail !== wanted) return false;
+
+                        return (
                             m.valid === true ||
-                            ["active", "valid", "went_valid", "completed", "trialing"].includes(m.status)
-                    );
+                            ["active", "valid", "went_valid", "trialing"].includes(m.status)
+                        );
+                    });
                     if (active) {
                         isPro = true;
                         whopMembershipId = active.id;

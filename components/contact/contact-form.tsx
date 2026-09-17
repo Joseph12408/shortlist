@@ -72,7 +72,7 @@ export function ContactForm() {
                 <h2 className="mt-4 text-xl font-semibold">Thanks — we&apos;ve got it</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                     Your message is on its way to us. We&apos;ll reply to the email you
-                    gave, usually within a couple of days.
+                    gave as soon as we can.
                 </p>
                 <div className="mt-6 flex justify-center gap-3">
                     <Button variant="outline" onClick={() => setStatus("idle")}>
