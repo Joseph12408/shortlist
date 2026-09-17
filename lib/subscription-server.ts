@@ -1,5 +1,6 @@
 import { auth, currentUser, createClerkClient } from "@clerk/nextjs/server";
 import { LIFETIME_PRO_EMAIL } from "./tiers";
+import { findActiveMembership } from "./whop-membership";
 
 /**
  * Server-side source of truth for subscription entitlement.
@@ -73,30 +74,12 @@ export async function getEntitlementWithSync(): Promise<Entitlement> {
             );
             if (res.ok) {
                 const data = await res.json();
-                const items = data.items || data.data || data;
-                if (Array.isArray(items)) {
-                    const wanted = email.toLowerCase();
-                    const active = items.find((m: any) => {
-                        // Never trust that the API filtered by email. A
-                        // membership only counts if it demonstrably belongs to
-                        // THIS user: without this check, an unfiltered list (or
-                        // an ignored `?email=` param) would hand Pro to every
-                        // caller that shares a Whop account with any active
-                        // member.
-                        const memberEmail = String(
-                            m.email ?? m.user?.email ?? ""
-                        ).toLowerCase();
-                        if (!memberEmail || memberEmail !== wanted) return false;
-
-                        return (
-                            m.valid === true ||
-                            ["active", "valid", "went_valid", "trialing"].includes(m.status)
-                        );
-                    });
-                    if (active) {
-                        isPro = true;
-                        whopMembershipId = active.id;
-                    }
+                // Only counts a membership that demonstrably belongs to this
+                // email. See lib/whop-membership.ts for why this guard exists.
+                const active = findActiveMembership(data, email);
+                if (active) {
+                    isPro = true;
+                    whopMembershipId = active.id ?? null;
                 }
             }
         } catch (e) {

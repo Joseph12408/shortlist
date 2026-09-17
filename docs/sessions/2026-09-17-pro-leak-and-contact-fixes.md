@@ -135,6 +135,26 @@ uncapped PDF, DOCX, unlimited saves. (Source: `lib/tiers.ts`,
 works, turning "trust the code" into a live demonstration. Lifetime account
 still protected.
 
+## Confirmed the leak was pre-fix, and locked it with a test
+Joseph found one affected free account: `isPro:true`, `selfHealedAt:
+2026-09-17T00:52:13Z`, `whopMembershipId: mem_NlpcFUI9yyv4SP` (a membership that
+is NOT that user's — proof the old code grabbed a stranger's active membership).
+That account was stamped **39 minutes before** the fix deployed
+(01:31:12Z, commit ecd5e7f), i.e. a genuine pre-fix victim — the fix works, it
+just never un-stamps existing accounts. Joseph knows the account owner and chose
+to **keep it Pro**; no cleanup run.
+
+To guarantee "never again":
+- Extracted the membership matching into a pure, import-light module
+  `lib/whop-membership.ts` (`findActiveMembership`, `isActiveMembershipForEmail`),
+  now the single source of truth used by both `lib/subscription-server.ts`
+  (request path) and `scripts/reconcile-pro.ts`.
+- Added `tests/entitlement.test.ts` (in the `npm test` fast suite): asserts a
+  stranger's active membership never grants Pro, an unfiltered company list grants
+  nothing to a caller with no membership, real matching memberships still work,
+  and fail-closed edges (no email, inactive status, empty response). 11 checks,
+  all passing; full fast suite (9 suites) green.
+
 ## Decisions
 - Entitlement fix errs strict: better to under-grant via the self-heal fallback
   (webhook still covers real activations) than ever over-grant.

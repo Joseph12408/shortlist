@@ -34,6 +34,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { createClerkClient } from "@clerk/backend";
+import { findActiveMembership } from "../lib/whop-membership";
 
 function envVar(name: string): string | undefined {
     if (process.env[name]) return process.env[name];
@@ -83,17 +84,9 @@ async function isActiveOnWhop(email: string): Promise<boolean | null> {
         );
         if (!res.ok) return null;
         const data = await res.json();
-        const items = data.items || data.data || data;
-        if (!Array.isArray(items)) return false;
-        const wanted = email.toLowerCase();
-        return items.some((m: any) => {
-            const memberEmail = String(m.email ?? m.user?.email ?? "").toLowerCase();
-            if (!memberEmail || memberEmail !== wanted) return false;
-            return (
-                m.valid === true ||
-                ["active", "valid", "went_valid", "trialing"].includes(m.status)
-            );
-        });
+        // Same email-matched logic as the app, so the script and the request
+        // path can never disagree about who is actually a member.
+        return findActiveMembership(data, email) !== null;
     } catch {
         return null;
     }

@@ -41,6 +41,7 @@ interface Suite {
 
 const FAST: Suite[] = [
     { name: 'Whop webhook signature verification', file: 'webhook-sig.test.ts' },
+    { name: 'Entitlement: no Pro leak from foreign memberships', file: 'entitlement.test.ts' },
     { name: 'Free/Pro tier rules and ATS feedback', file: 'tiers.test.ts' },
     { name: 'PDF watermark injection (all templates)', file: 'watermark.test.ts' },
     { name: 'Onboarding email rendering', file: 'email-render.test.ts' },
