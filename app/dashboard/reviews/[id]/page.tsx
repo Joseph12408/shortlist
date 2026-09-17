@@ -38,22 +38,15 @@ export default function ReviewDetailPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-            <div className="bg-white dark:bg-slate-900 border-b p-4 sm:p-6">
-                <div className="container mx-auto flex items-center justify-between gap-4">
-                    <button
-                        onClick={() => router.push("/dashboard/reviews")}
-                        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm font-medium">All reviews</span>
-                    </button>
-                    <h1 className="text-base sm:text-xl font-bold">Saved Review</h1>
-                    <div className="w-8 sm:w-24" />
-                </div>
-            </div>
-
-            <main className="flex-1 container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-4xl">
+        <div className="min-h-screen bg-background">
+            <main className="container mx-auto px-4 sm:px-6 py-8 sm:py-10 max-w-4xl">
+                <button
+                    onClick={() => router.push("/dashboard/reviews")}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="text-sm font-medium">All reviews</span>
+                </button>
                 {review === undefined ? (
                     <AnalysisDetailSkeleton />
                 ) : review === null ? (
@@ -69,7 +62,7 @@ export default function ReviewDetailPage() {
                 ) : (
                     <>
                         {review.jobDescriptionPreview && (
-                            <div className="mb-8 rounded-xl border bg-white dark:bg-slate-900 p-4 sm:p-6">
+                            <div className="mb-6 rounded-xl border bg-card p-4 sm:p-6">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
                                     <Briefcase className="w-4 h-4 text-slate-400" />
                                     Matched against this job description

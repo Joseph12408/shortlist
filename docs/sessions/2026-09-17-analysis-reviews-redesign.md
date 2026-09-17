@@ -42,6 +42,31 @@ only on scores and badges.
   mobile stacks correctly (header→hamburger, KPI cards stack, card score/actions
   reflow below the title). Preview route + screenshot script deleted afterwards.
 
+## Follow-up: report view redesign (second Stitch design)
+Joseph supplied a second Stitch design — the detailed report/results view
+("Report #REV-8849"). It shipped with many fabricated features (inline
+Apply/Dismiss suggestions, "Apply All AI Edits", Export Report, Simulated
+Recruiter Glance, three made-up metric cards). Joseph chose **"adapt & drop the
+fakes"**.
+
+Both the live results and the saved-review detail render one component
+(`AnalysisResults`), so it was restyled once and both pages get the look:
+- Header card (verified/date meta, Outfit title, Optimize + secondary actions).
+- Circular overall score gauge + strengths/to-improve summary.
+- Real "Score breakdown" of the 5 category scores.
+- "Ready to lift your score?" optimize banner (real onOptimize → builder).
+- Missing-keyword chips.
+- Pro: the "5-pillar comprehensive audit" = the 5 real categories, each a card
+  with score, status badge, and its findings + "how to fix it" solutions.
+- Free: top-3 issues + the existing Pro upsell. Gating unchanged.
+- Dropped every fabricated feature — no dead buttons.
+- `app/dashboard/reviews/[id]/page.tsx` chrome simplified (bg-background, slim
+  back link) since the component now renders its own header.
+
+Verified via a throwaway client preview route: desktop + mobile screenshots of
+the report (free view, which shares all the new primitives). Preview + script
+deleted. tsc clean on the changed files.
+
 ## Notes / still open
 - The analysis "results" view still uses the existing `AnalysisResults` component
   (unchanged) — only the hub was redesigned. Could be restyled to match later if
