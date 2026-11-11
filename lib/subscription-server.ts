@@ -1,6 +1,6 @@
 import { auth, currentUser, createClerkClient } from "@clerk/nextjs/server";
 import { LIFETIME_PRO_EMAIL } from "./tiers";
-import { findActiveMembership } from "./whop-membership";
+import { lookupWhopMembership } from "./whop-membership";
 
 /**
  * Server-side source of truth for subscription entitlement.
@@ -52,7 +52,7 @@ export async function getEntitlement(): Promise<Entitlement> {
  * Authoritative entitlement check that queries Whop directly and repairs
  * stale Clerk metadata.
  *
- * Slower (one outbound API call), use only where freshness matters more than
+ * Slower (up to two outbound API calls), use only where freshness matters more than
  * latency, i.e. the explicit `/api/subscription/check` endpoint and
  * post-checkout confirmation. Request-path gating should use `getEntitlement()`.
  */
@@ -67,23 +67,14 @@ export async function getEntitlementWithSync(): Promise<Entitlement> {
     let whopMembershipId: string | null = null;
 
     if (process.env.WHOP_API_KEY) {
-        try {
-            const res = await fetch(
-                `https://api.whop.com/v2/memberships?email=${encodeURIComponent(email)}`,
-                { headers: { Authorization: `Bearer ${process.env.WHOP_API_KEY}` } }
-            );
-            if (res.ok) {
-                const data = await res.json();
-                // Only counts a membership that demonstrably belongs to this
-                // email. See lib/whop-membership.ts for why this guard exists.
-                const active = findActiveMembership(data, email);
-                if (active) {
-                    isPro = true;
-                    whopMembershipId = active.id ?? null;
-                }
-            }
-        } catch (e) {
-            console.error("[ENTITLEMENT] Whop check failed:", e);
+        // Only counts a membership that demonstrably belongs to this email.
+        // See lib/whop-membership.ts for why this guard exists.
+        const result = await lookupWhopMembership(email, process.env.WHOP_API_KEY);
+        if (result.status === "active") {
+            isPro = true;
+            whopMembershipId = result.membershipId;
+        } else if (result.status === "error") {
+            console.error("[ENTITLEMENT] Whop check failed:", result.reason);
         }
     }
 
