@@ -34,7 +34,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { createClerkClient } from "@clerk/backend";
-import { findActiveMembership } from "../lib/whop-membership";
+import { lookupWhopMembership } from "../lib/whop-membership";
 
 function envVar(name: string): string | undefined {
     if (process.env[name]) return process.env[name];
@@ -77,19 +77,11 @@ const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY });
  */
 async function isActiveOnWhop(email: string): Promise<boolean | null> {
     if (!WHOP_API_KEY) return null;
-    try {
-        const res = await fetch(
-            `https://api.whop.com/v2/memberships?email=${encodeURIComponent(email)}`,
-            { headers: { Authorization: `Bearer ${WHOP_API_KEY}` } }
-        );
-        if (!res.ok) return null;
-        const data = await res.json();
-        // Same email-matched logic as the app, so the script and the request
-        // path can never disagree about who is actually a member.
-        return findActiveMembership(data, email) !== null;
-    } catch {
-        return null;
-    }
+    // Same email-matched lookup as the app, so the script and the request
+    // path can never disagree about who is actually a member.
+    const result = await lookupWhopMembership(email, WHOP_API_KEY);
+    if (result.status === "error") return null;
+    return result.status === "active";
 }
 
 async function resetOneAccount(targetEmail: string) {
