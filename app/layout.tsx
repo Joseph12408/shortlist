@@ -10,7 +10,7 @@ import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Shortlist | Build resumes that get you hired",
-  description: "ATS-safe, modern, and effective resumes for early-career professionals.",
+  description: "Grade your resume against a strict 100-point rubric, see what is costing you points, and rewrite it for the job you want.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Outfit:wght@100..900&family=Merriweather:wght@300;400;700;900&family=Source+Sans+3:wght@200..900&display=swap" rel="stylesheet" />
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Gloock&family=Caveat:wght@700&family=Outfit:wght@100..900&family=Merriweather:wght@300;400;700;900&family=Source+Sans+3:wght@200..900&display=swap" rel="stylesheet" />
         </head>
         <body
           className={`font-sans antialiased bg-background text-foreground`}

@@ -1,18 +1,24 @@
 import { Footer } from "@/components/layout/footer";
 import { Hero } from "@/components/landing/hero";
-import { Features } from "@/components/landing/features";
+import { Rubric } from "@/components/landing/rubric";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { Tailor } from "@/components/landing/tailor";
+import { TemplateShowcase } from "@/components/landing/template-showcase";
 import { Pricing } from "@/components/landing/pricing";
-import { AnalysisPreview } from "@/components/landing/analysis-preview";
+import { Faq } from "@/components/landing/faq";
 import { CTASection } from "@/components/landing/cta-section";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col font-sans">
+    <div className="ld flex min-h-screen flex-col font-sans">
       <main className="flex-1">
         <Hero />
-        <Features />
-        <AnalysisPreview />
+        <Rubric />
+        <HowItWorks />
+        <Tailor />
+        <TemplateShowcase />
         <Pricing />
+        <Faq />
         <CTASection />
       </main>
       <Footer />

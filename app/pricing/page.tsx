@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function PricingPage() {
     return (
-        <div className="flex min-h-screen flex-col font-sans">
+        <div className="ld flex min-h-screen flex-col font-sans">
             <main className="flex-1">
                 <Pricing />
             </main>
